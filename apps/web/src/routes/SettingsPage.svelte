@@ -92,6 +92,7 @@
         options={[
           { value: 'system', label: 'Auto', icon: 'monitor' },
           { value: 'light', label: 'Light', icon: 'sun' },
+          { value: 'dim', label: 'Dim', icon: 'dim' },
           { value: 'dark', label: 'Dark', icon: 'moon' },
         ]}
       />
@@ -135,7 +136,7 @@
     <div class="row">
       <p class="row-text">Page colour</p>
       <Segmented label="Book theme" value={settings.synced.book.theme} onchange={(v) => settings.updateSynced((s) => (s.book.theme = v))}
-        options={[{ value: 'light', label: 'Light' }, { value: 'sepia', label: 'Sepia' }, { value: 'dark', label: 'Dark' }]} />
+        options={[{ value: 'light', label: 'Light' }, { value: 'sepia', label: 'Sepia' }, { value: 'dim', label: 'Dim' }, { value: 'dark', label: 'Dark' }]} />
     </div>
   </section>
 

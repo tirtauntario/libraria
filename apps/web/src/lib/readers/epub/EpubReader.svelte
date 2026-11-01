@@ -40,8 +40,12 @@
   let frame = $state<HTMLIFrameElement>();
   let peel = $state<HTMLIFrameElement>();
 
+  /** Text area, between the reader bars: the frames' size. */
   let W = $state(0);
   let H = $state(0);
+  /** The whole sheet of paper, which is what turns. */
+  let SW = $state(0);
+  let SH = $state(0);
 
   const bs = $derived(settings.synced.book);
   const paginated = $derived(bs.flow === 'paginated');
@@ -427,7 +431,9 @@
 
   const iw = $derived(Math.floor(W));
   const ih = $derived(Math.floor(H));
-  /** Inline styles for the frames and the overlays while a page turns. */
+  const sw = $derived(Math.floor(SW));
+  const sh = $derived(Math.floor(SH));
+  /** Inline styles for the sheets and the overlays while a page turns. */
   const layers = $derived.by(() => {
     const idle = { main: '', peel: 'visibility: hidden;', shadow: '', flap: '' };
     if (!turn || turnStyle === 'none') return idle;
@@ -435,11 +441,11 @@
     const peelIsEarlier = dir > 0;
     if (turnStyle === 'slide') {
       const s = rtl ? -1 : 1;
-      const earlier = `z-index: 2; transform: translateX(${-s * p * iw}px); box-shadow: 0 0 24px rgb(0 0 0 / 0.18);`;
-      const later = `z-index: 1; transform: translateX(${s * (1 - p) * iw}px);`;
+      const earlier = `z-index: 2; transform: translateX(${-s * p * sw}px); box-shadow: 0 0 24px rgb(0 0 0 / 0.18);`;
+      const later = `z-index: 1; transform: translateX(${s * (1 - p) * sw}px);`;
       return { main: peelIsEarlier ? later : earlier, peel: peelIsEarlier ? earlier : later, shadow: '', flap: '' };
     }
-    const g = curlGeometry(p, iw, ih, { rtl, corner: turn.corner });
+    const g = curlGeometry(p, sw, sh, { rtl, corner: turn.corner });
     const earlier = `z-index: 3; clip-path: ${polygonCss(g.front)};`;
     const later = 'z-index: 1;';
     const width = Math.min(48, 10 + (g.edge - g.fold) * 0.25);
@@ -846,31 +852,34 @@
   tone={bs.theme}
 >
   <div class="paper" style:background={theme.bg} style:color={theme.fg}>
-    <div class="host" class:turning={!!turn} bind:clientWidth={W} bind:clientHeight={H}>
-      <iframe
-        bind:this={frame}
-        title="Book text"
-        sandbox="allow-same-origin"
-        referrerpolicy="no-referrer"
-        style={layers.main}
-        style:width="{iw}px"
-        style:height="{ih}px"
-        class:hidden={loading}
-      ></iframe>
+    <div class="host" class:turning={!!turn} bind:clientWidth={SW} bind:clientHeight={SH}>
+      <div class="area" bind:clientWidth={W} bind:clientHeight={H}></div>
+      <!-- Each frame sits on a full-size sheet, so a turn moves the whole page, margins included. -->
+      <div class="sheet" style={layers.main} style:background={theme.bg}>
+        <iframe
+          bind:this={frame}
+          title="Book text"
+          sandbox="allow-same-origin"
+          referrerpolicy="no-referrer"
+          style:width="{iw}px"
+          style:height="{ih}px"
+          class:hidden={loading}
+        ></iframe>
+      </div>
       <!-- The page being turned (see the component comment). Same sandbox; never interactive. -->
-      <iframe
-        bind:this={peel}
-        class="peel"
-        title="Page turn"
-        aria-hidden="true"
-        tabindex="-1"
-        inert
-        sandbox="allow-same-origin"
-        referrerpolicy="no-referrer"
-        style={layers.peel}
-        style:width="{iw}px"
-        style:height="{ih}px"
-      ></iframe>
+      <div class="sheet peel" style={layers.peel} style:background={theme.bg}>
+        <iframe
+          bind:this={peel}
+          title="Page turn"
+          aria-hidden="true"
+          tabindex="-1"
+          inert
+          sandbox="allow-same-origin"
+          referrerpolicy="no-referrer"
+          style:width="{iw}px"
+          style:height="{ih}px"
+        ></iframe>
+      </div>
       {#if layers.shadow}<div class="turn-layer" style="z-index: 2; {layers.shadow}"></div>{/if}
       {#if layers.flap}<div class="turn-layer flap-shadow"><div class="turn-layer" style={layers.flap}></div></div>{/if}
       {#if turn}
@@ -907,17 +916,30 @@
     transition: background-color 200ms ease;
   }
   .host {
+    --area-top: max(52px, calc(var(--safe-top) + 48px));
+    --area-bottom: max(56px, calc(var(--safe-bottom) + 48px));
     position: absolute;
-    top: max(52px, calc(var(--safe-top) + 48px));
-    bottom: max(56px, calc(var(--safe-bottom) + 48px));
+    inset: 0;
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .area {
+    position: absolute;
+    top: var(--area-top);
+    bottom: var(--area-bottom);
     left: var(--safe-left);
     right: var(--safe-right);
-    overflow: hidden;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .sheet {
+    position: absolute;
+    inset: 0;
   }
   iframe {
     position: absolute;
-    top: 0;
-    left: 0;
+    top: var(--area-top);
+    left: var(--safe-left);
     display: block;
     border: 0;
     background: transparent;
@@ -929,7 +951,7 @@
   .peel {
     pointer-events: none;
   }
-  .turning iframe {
+  .turning .sheet {
     will-change: transform, clip-path;
   }
   .turn-layer {

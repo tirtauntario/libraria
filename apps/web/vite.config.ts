@@ -13,7 +13,8 @@ const build = buildInfo(pkg.version);
 // `@codedread/bitjs/archive/unrar.js` directly. Point that at the real file.
 const bitjsDir = dirname(createRequire(new URL('../../packages/core/package.json', import.meta.url)).resolve('@codedread/bitjs'));
 
-const THEME = '#24584b';
+// Installed on Android, theme_color paints the system bars (the strip behind the
+// gesture pill too), so it matches the page instead of the brand green.
 const BACKGROUND = '#f7f5f0';
 
 export default defineConfig({
@@ -45,7 +46,7 @@ export default defineConfig({
         scope: './',
         display: 'standalone',
         orientation: 'any',
-        theme_color: THEME,
+        theme_color: BACKGROUND,
         background_color: BACKGROUND,
         categories: ['books', 'entertainment'],
         icons: [

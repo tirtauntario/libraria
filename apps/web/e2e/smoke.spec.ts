@@ -144,7 +144,7 @@ test('import, read, restore progress, work offline', async ({ page, context }) =
   await expect(pos).toContainText('2 /');
   // Tapping the right third of the page turns it too (events inside the sandboxed frame).
   // Wait for the page-turn animation to end: mid-slide the frame is moved aside.
-  await expect(page.locator('iframe.peel')).toBeHidden();
+  await expect(page.locator('iframe[title="Page turn"]')).toBeHidden();
   const box = (await iframe.boundingBox())!;
   await page.mouse.click(box.x + box.width * 0.9, box.y + box.height / 2);
   await showControls(page);

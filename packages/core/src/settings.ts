@@ -2,7 +2,7 @@ export type ComicReadingMode = 'paged' | 'continuous';
 export type ReadingDirection = 'ltr' | 'rtl';
 export type FitMode = 'contain' | 'width' | 'height' | 'original';
 export type BookFlow = 'paginated' | 'scrolled';
-export type BookTheme = 'light' | 'sepia' | 'dark';
+export type BookTheme = 'light' | 'sepia' | 'dim' | 'dark';
 export type BookFont = 'publisher' | 'serif' | 'sans' | 'dyslexic' | 'mono';
 /** Animation when a paginated EPUB page turns. */
 export type PageTurn = 'none' | 'slide' | 'curl';
