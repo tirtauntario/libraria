@@ -13,7 +13,7 @@ import type { BookFileRecord, BookRecord, OfflineFileRecord } from '../db/schema
 import { isMetered, isOnline } from '../net.svelte';
 import type { Services } from '../services';
 import type { SourceDriver } from '../sources/types';
-import { runEviction } from './offline';
+import { removeOfflineCopy, runEviction } from './offline';
 
 export type OpenStage =
   | { phase: 'locating' }
@@ -130,6 +130,8 @@ export async function identify(book: BookRecord, blob: Blob, filename: string, s
   if (twin && twin.id !== book.id) {
     const merged = await s.repo.mergeBooks(book.id, twin.id);
     if (merged?.droppedOffline) await s.files.remove(merged.droppedOffline.opfsName);
+    // A copy on the device makes the download we just did redundant.
+    if ((await locate(twin.id, s)).local.length) await removeOfflineCopy(twin.id, s);
     return merged?.book ?? twin;
   }
 

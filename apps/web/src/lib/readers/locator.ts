@@ -60,11 +60,15 @@ export interface ProgressSaver {
 export function createProgressSaver(
   save: (loc: Locator) => Promise<unknown>,
   delay = SAVE_DEBOUNCE_MS,
-  timers: { set: typeof setTimeout; clear: typeof clearTimeout } = { set: setTimeout, clear: clearTimeout },
+  // Wrapped: calling the globals as methods of another object throws "Illegal invocation".
+  timers: { set: (fn: () => void, ms: number) => unknown; clear: (t: unknown) => void } = {
+    set: (fn, ms) => setTimeout(fn, ms),
+    clear: (t) => clearTimeout(t as ReturnType<typeof setTimeout>),
+  },
 ): ProgressSaver {
   let pending: Locator | null = null;
   let lastKey: string | null = null;
-  let timer: ReturnType<typeof setTimeout> | null = null;
+  let timer: unknown = null;
 
   const run = async () => {
     timer = null;

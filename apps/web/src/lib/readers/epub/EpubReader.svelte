@@ -142,10 +142,14 @@
   }
 
   function measure() {
-    const el = scroller();
-    if (!el) return;
-    if (paginated) pages = countPages(el.scrollWidth, pageWidth());
-    else pages = 1;
+    const body = frame?.contentDocument?.body;
+    if (!body) return;
+    if (paginated) {
+      body.style.transform = '';
+      pages = countPages(body.scrollWidth, pageWidth());
+    } else {
+      pages = 1;
+    }
   }
 
   function position(target: Target) {
@@ -176,16 +180,24 @@
   function pageOfFragment(id: string): number | null {
     const el = findFragment(id);
     if (!el) return null;
+    const body = frame?.contentDocument?.body;
+    if (body) body.style.transform = ''; // measure from page 0
     const pw = pageWidth();
-    const left = el.getBoundingClientRect().left;
-    const p = rtl ? page - Math.floor(left / pw) : page + Math.floor(left / pw);
-    return Math.min(pages - 1, Math.max(0, p));
+    const col = Math.floor(el.getBoundingClientRect().left / pw);
+    return Math.min(pages - 1, Math.max(0, rtl ? -col : col));
   }
 
+  /**
+   * Paginated mode shifts the body sideways instead of scrolling: the last
+   * column of a chapter can then always be shown whole (scrollWidth does not
+   * include the trailing column gap, so scrolling would stop short).
+   */
   function showPage(p: number) {
-    const el = scroller();
+    const doc = frame?.contentDocument;
     page = Math.min(pages - 1, Math.max(0, p));
-    if (el) el.scrollLeft = (rtl ? -1 : 1) * page * pageWidth();
+    if (!doc?.body) return;
+    doc.body.style.transform = page ? `translateX(${(rtl ? 1 : -1) * page * pageWidth()}px)` : '';
+    if (doc.scrollingElement) doc.scrollingElement.scrollLeft = 0;
   }
 
   /** Re-paginate (resize, settings change) and stay at the same place. */
@@ -194,6 +206,7 @@
     if (!doc || loading) return;
     // Not `progression`: after a flow switch it would read the other mode's state.
     const keep = lastProgression;
+    if (!paginated) doc.body.style.transform = '';
     const style = doc.getElementById('libraria-reader');
     lastCss = css();
     if (style) style.textContent = lastCss;
@@ -331,13 +344,10 @@
         report();
       });
     };
-    // Keep the paginated scroll position exact (e.g. after find-in-page or focus moves).
+    // Paginated: the document itself never scrolls (focus or find-in-page could move it).
     const onPaginatedScroll = () => {
-      if (!paginated) return;
       const el = scroller();
-      if (!el) return;
-      const expected = (rtl ? -1 : 1) * page * pageWidth();
-      if (Math.abs(el.scrollLeft - expected) > 2) el.scrollLeft = expected;
+      if (paginated && el && (el.scrollLeft !== 0 || el.scrollTop !== 0)) el.scrollTo(0, 0);
     };
 
     doc.addEventListener('click', onClick);
@@ -570,7 +580,7 @@
   {footer}
   tone={bs.theme}
 >
-  <div class="page" style:background={theme.bg} style:color={theme.fg}>
+  <div class="paper" style:background={theme.bg} style:color={theme.fg}>
     <div class="host" bind:clientWidth={W} bind:clientHeight={H}>
       <iframe
         bind:this={frame}
@@ -595,7 +605,7 @@
 </ReaderChrome>
 
 <style>
-  .page {
+  .paper {
     position: absolute;
     inset: 0;
     transition: background-color 200ms ease;

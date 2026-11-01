@@ -24,6 +24,10 @@ export const LINE_HEIGHT = { min: 1.1, max: 2.2, step: 0.1 };
 export const MARGIN = { min: 0, max: 20, step: 1 };
 export const WORD_SPACING = { min: 0, max: 0.5, step: 0.05 };
 
+export function columnsPerPage(width: number): number {
+  return width >= 1000 ? 2 : 1;
+}
+
 export interface PageGeometry {
   /** Horizontal padding (px) on each side of the text column. */
   padX: number;
@@ -44,7 +48,10 @@ export function readerCss(
   const theme = BOOK_THEMES[book.theme] ?? BOOK_THEMES.light;
   const font = BOOK_FONTS[book.font]?.stack ?? null;
   const { padX, padY } = pageGeometry(book, opts.width, opts.height);
-  const colW = Math.max(100, opts.width - padX * 2);
+  // Two text columns per page on wide screens keep lines a readable length.
+  // Page stride must equal the frame width: n × (column + gap) = width, gap = 2 × padX.
+  const perPage = opts.paginated ? columnsPerPage(opts.width) : 1;
+  const colW = Math.max(100, Math.floor(opts.width / perPage) - padX * 2);
   const textH = Math.max(100, opts.height - padY * 2);
   const css: string[] = [];
 
@@ -81,7 +88,7 @@ export function readerCss(
   } else {
     css.push(`html { overflow-y: auto !important; overflow-x: hidden !important; }`);
     css.push(
-      `body { margin: 0 auto !important; box-sizing: border-box !important; max-width: ${Math.max(colW, 0) + padX * 2}px !important;` +
+      `body { margin: 0 auto !important; box-sizing: border-box !important; max-width: ${Math.min(opts.width, Math.round((720 * book.fontSize) / 100) + padX * 2)}px !important;` +
         ` padding: ${padY + 40}px ${padX}px ${padY + 80}px !important; overflow-wrap: break-word; }`,
     );
     css.push(`img, svg, video, table { max-width: 100% !important; }`);

@@ -106,7 +106,7 @@
     <div class="stage" in:fly={{ x: reduceMotion ? 0 : moveDir * (direction === 'rtl' ? -48 : 48), duration: reduceMotion ? 0 : 220, opacity: 0.2 }}>
       {#each layout as p (p.index)}
         {@const url = pages.urls.get(p.index)}
-        <div class="page" style:width="{p.w}px" style:height="{p.h}px">
+        <div class="pagebox" style:width="{p.w}px" style:height="{p.h}px">
           {#if url}
             <img src={url} alt="Page {p.index + 1}" draggable="false" />
           {:else}
@@ -137,7 +137,7 @@
     display: flex;
     flex: none;
   }
-  .page {
+  .pagebox {
     position: relative;
     flex: none;
     display: grid;
