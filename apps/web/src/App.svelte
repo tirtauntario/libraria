@@ -12,6 +12,7 @@
   import DropZone from './lib/ui/DropZone.svelte';
   import Shell from './lib/ui/Shell.svelte';
   import Toasts from './lib/ui/Toasts.svelte';
+  import { announceUpdate } from './lib/version';
 
   let ready = $state(false);
   let error = $state<string | null>(null);
@@ -30,6 +31,7 @@
       await Promise.all([settings.load(s.repo), catalog.load(s)]);
       ready = true;
       pwa.init();
+      announceUpdate();
       listenForLaunchFiles();
       void runEviction(s).catch(() => {});
       void runStartupHooks();
