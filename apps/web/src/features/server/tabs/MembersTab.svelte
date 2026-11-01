@@ -73,7 +73,7 @@
         {#each pending as u (u.id)}
           <li class="card user" data-testid="pending-user">
             <span class="avatar">{u.username.slice(0, 1).toUpperCase()}</span>
-            <div class="text"><p class="name">{u.username}</p><p class="small subtle">Signed up {formatRelative(u.createdAt)}</p></div>
+            <div class="text"><p class="name">{u.username}</p><p class="small subtle">Signed up {formatRelative(u.createdAt).toLowerCase()}</p></div>
             <div class="actions">
               <button class="btn small ghost" type="button" disabled={busy === u.id} onclick={() => update(u, { status: 'rejected' }, `Rejected ${u.username}`)}>Reject</button>
               <button class="btn small primary" type="button" disabled={busy === u.id} onclick={() => update(u, { status: 'active' }, `${u.username} can now sign in`)}>Approve</button>
@@ -93,7 +93,7 @@
           <div class="text">
             <p class="name">{u.username} {#if u.id === meId}<span class="subtle small">(you)</span>{/if}</p>
             <p class="small subtle">
-              <span class="status {u.status}">{STATUS[u.status]}</span> · joined {formatRelative(u.createdAt)}
+              <span class="status {u.status}">{STATUS[u.status]}</span> · joined {formatRelative(u.createdAt).toLowerCase()}
             </p>
           </div>
           <div class="actions">

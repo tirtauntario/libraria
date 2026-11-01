@@ -8,7 +8,8 @@
  * - refreshServerCatalog() runs the generic scan, then copies the server's
  *   metadata into the local book records and caches covers.
  *
- * Paths are `<serverBookId>.<format>`: stable across title edits.
+ * Paths are `<serverBookId>/<title>.<format>`; a renamed book gets a new path
+ * on the next refresh (same SHA-512, so it stays the same local book).
  */
 import type { Component } from 'svelte';
 import { BOOK_FORMATS, type BookDto, type BookFormat, type Source } from '@libraria/core';
@@ -25,13 +26,14 @@ export const MAX_COVER_BYTES = 5 * 1024 * 1024;
 const LIST_CACHE_MS = 10_000;
 const RESUME_ATTEMPTS = 4;
 
-export function serverBookPath(dto: Pick<BookDto, 'id' | 'format'>): string {
-  return `${dto.id}.${dto.format}`;
+/** `<serverBookId>/<title>.<format>`: the id keeps it unique, the name reads well on the book page. */
+export function serverBookPath(dto: Pick<BookDto, 'id' | 'format' | 'title'>): string {
+  return `${dto.id}/${safeName(dto.title, dto.format)}`;
 }
 
 /** Server book id from a bookFiles path, or null. */
 export function serverBookIdFromPath(path: string): string | null {
-  const m = /^([0-9a-f-]{36})\.(cbz|cbr|epub|pdf)$/i.exec(path);
+  const m = /^([0-9a-f-]{36})\//i.exec(path);
   return m ? m[1]! : null;
 }
 
@@ -323,6 +325,8 @@ export const REFRESH_INTERVAL_MS = 5 * 60_000;
 /** Refresh when the cached catalog is older than `maxAgeMs` and the device is online. */
 export async function refreshIfStale(source: LibrariaSource, s: Services, maxAgeMs = REFRESH_INTERVAL_MS): Promise<RefreshResult | null> {
   if (!isOnline()) return null;
+  // Signed out (an account but no token): nothing to fetch until the user signs in.
+  if (!source.config.token && source.config.username) return null;
   const state = await getServerState(s.repo, source.id);
   if (state.sessionExpired) return null;
   if (Date.now() - state.lastRefreshAt < maxAgeMs) return null;

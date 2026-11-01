@@ -52,7 +52,7 @@
           <span class="item-text">
             <span class="item-name">{source.name}</span>
             <span class="subtle small">
-              {hostOf(source.config.url)} · {guest ? 'Guest' : `${source.config.username} · ${ROLE_LABEL[source.config.role]}`} ·
+              {hostOf(source.config.url)} · {guest ? (source.config.username ? `${source.config.username} · signed out` : 'Guest') : `${source.config.username} · ${ROLE_LABEL[source.config.role]}`} ·
               {plural(counts.get(source.id) ?? 0, 'book')}
             </span>
           </span>

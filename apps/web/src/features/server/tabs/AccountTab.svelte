@@ -87,7 +87,11 @@
         {#if entry.state.info}<div><dt>Server version</dt><dd>{entry.state.info.serverVersion}</dd></div>{/if}
       </dl>
     {:else}
-      <p class="muted">You are browsing as a guest. Create an account to download books, send books and sync.</p>
+      {#if c.username}
+        <p class="muted">You are signed out as <strong>{c.username}</strong>. Books you downloaded still open.</p>
+      {:else}
+        <p class="muted">You are browsing as a guest. Create an account to download books, send books and sync.</p>
+      {/if}
       <div class="row">
         <a class="btn" href={joinHref('login')}>Sign in</a>
         <a class="btn primary" href={joinHref('register')}>Create account</a>

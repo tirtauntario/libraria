@@ -38,7 +38,7 @@
     { id: 'invites', label: 'Invites', component: InvitesTab, show: canManageBooks(role) },
     { id: 'settings', label: 'Library settings', component: SettingsTab, show: role === 'owner' },
     { id: 'sources', label: 'Disk sources', component: SourcesTab, show: role === 'owner' },
-    { id: 'account', label: role ? 'Account' : 'Guest', component: AccountTab, show: true },
+    { id: 'account', label: role || entry?.source.config.username ? 'Account' : 'Guest', component: AccountTab, show: true },
   ].filter((t) => t.show));
   const current = $derived(tabs.find((t) => t.id === router.query.get('tab')) ?? tabs[0]!);
 
@@ -67,9 +67,9 @@
       <h1>{entry?.source.name ?? 'Server'}</h1>
       {#if entry}
         <p class="subtle small">
-          {hostOf(entry.source.config.url)} ·
-          {role ? `${entry.source.config.username} · ${ROLE_LABEL[role]}` : 'Guest'}
-          {#if sync.home?.sourceId === entry.source.id}&nbsp;· sync server{/if}
+          {[hostOf(entry.source.config.url), role ? `${entry.source.config.username} · ${ROLE_LABEL[role]}` : entry.source.config.username ? `${entry.source.config.username} · signed out` : 'Guest', sync.home?.sourceId === entry.source.id ? 'sync server' : '']
+            .filter(Boolean)
+            .join(' · ')}
         </p>
       {/if}
     </div>

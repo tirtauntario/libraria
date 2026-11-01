@@ -31,6 +31,9 @@ let dataDir = '';
 let setupToken = '';
 
 async function shot(page: Page, name: string) {
+  // Toasts would cover the content.
+  const toasts = page.getByRole('region', { name: 'Notifications' }).getByRole('button', { name: 'Dismiss' });
+  for (const b of await toasts.all()) await b.click({ timeout: 1000 }).catch(() => {});
   await page.waitForTimeout(350);
   await page.screenshot({ path: `${SHOTS}/server-${name}.png`, fullPage: false });
 }

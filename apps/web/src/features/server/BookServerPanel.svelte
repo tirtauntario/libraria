@@ -25,6 +25,10 @@
       .filter((x): x is { file: typeof x.file; entry: NonNullable<typeof x.entry> } => !!x.entry),
   );
   const jobs = $derived(servers.uploads.filter((j) => j.bookId === book.id));
+  // Finished uploads whose server copy is listed above say nothing new.
+  const shownJobs = $derived(
+    jobs.filter((j) => !((j.status === 'approved' || j.status === 'exists') && copies.some((c) => c.entry.source.id === j.sourceId))),
+  );
   const busyServers = $derived(new Set(jobs.filter((j) => !['failed', 'rejected'].includes(j.status)).map((j) => j.sourceId)));
   const targets = $derived(
     servers.signedIn.filter((e) => !onServer(book.id, e.source.id) && !busyServers.has(e.source.id) && (canManageBooks(e.source.config.role) || (e.state.info?.membersCanSubmit ?? true))),
@@ -115,7 +119,7 @@
   }
 </script>
 
-{#if copies.length || canSend || jobs.length}
+{#if copies.length || canSend || shownJobs.length}
   <section class="panel">
     <h3>Libraria servers</h3>
     {#if copies.length}
@@ -143,8 +147,8 @@
         {/each}
       </ul>
     {/if}
-    {#if jobs.length}
-      <UploadList {jobs} showServer showTitle={false} />
+    {#if shownJobs.length}
+      <UploadList jobs={shownJobs} showServer showTitle={false} />
     {/if}
     {#if canSend}
       <div class="send">

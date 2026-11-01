@@ -56,7 +56,7 @@ export function normalizeServerUrl(input: string): string {
 }
 
 /** True when this page cannot call `serverUrl` because of mixed content. */
-export function isMixedContent(serverUrl: string, pageProtocol = typeof location !== 'undefined' ? location.protocol : 'https:'): boolean {
+export function isMixedContent(serverUrl: string, pageProtocol = typeof location !== 'undefined' ? location.protocol : 'http:'): boolean {
   return pageProtocol === 'https:' && serverUrl.startsWith('http:');
 }
 
