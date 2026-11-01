@@ -11,7 +11,7 @@ pnpm --filter @libraria/web e2e       # Playwright smoke test against `vite prev
 pnpm --filter @libraria/web icons     # re-render PNG icons from the SVG logo
 ```
 
-The e2e run writes screenshots to `test-results/screens/` (git-ignored).
+The e2e run writes screenshots to `test-results/screens/` (git-ignored). `E2E_PORT=4391 pnpm --filter @libraria/web e2e` uses another preview port. `e2e/sources.spec.ts` starts its own WebDAV server (`e2e/webdav-server.ts`) on a random port.
 
 ## Layout
 
@@ -26,7 +26,8 @@ src/
     db/repo.ts            every read/write; records the sync change log
     db/events.ts          change bus (also relayed to other tabs)
     storage/opfs.ts       file store: OPFS (streaming writes) or IndexedDB blobs; quota/persist
-    sources/              SourceDriver interface, registry, local driver, stubs
+    sources/              SourceDriver interface, registry, drivers (local, folder, webdav, gdrive, dropbox),
+                          OAuth redirect plumbing, setup forms (ui/)
     library/              import, scan, open/download, offline + eviction, catalog logic
     readers/              shared chrome, gestures, locators; comic/, pdf/, epub/
     stores/               reactive state (catalog, settings, toasts, importer, pwa)
@@ -42,7 +43,7 @@ src/
 | Store | Key | Notes |
 |---|---|---|
 | `books` | `id` (UUIDv7) | `sha512` nullable (unique index skips nulls), metadata, cover thumbnail Blob, `customGroup`, `metaSource` (`file` / `filename` placeholder), `metaEdited`, `addedAt`, `updatedAt`, `lastReadAt` |
-| `bookFiles` | `id` | where a book lives: `bookId`, `sourceId`, `path`, `size`, `mtime`, `etag`; unique `[sourceId, path]` |
+| `bookFiles` | `id` | where a book lives: `bookId`, `sourceId`, `path`, `size`, `mtime`, `etag`, optional `displayPath` and `missing`; unique `[sourceId, path]` |
 | `offlineFiles` | `id` | downloaded copy of a remote book in the file store: `opfsName`, `size`, `pinned`, `lastOpenedAt` |
 | `fileBlobs` | file-store name | IndexedDB fallback when OPFS is missing |
 | `progress` | `sha512` | natural key: exactly one progress per book across devices (LWW) |
@@ -71,6 +72,22 @@ Reuse, don't rewrite:
 - `scanSource(source, rootPath, services, { signal, onProgress, recursive, prune })` in `lib/library/scan.ts` walks `list()`, creates placeholder books (`sha512: null`, title from the filename), updates changed files (size/mtime/etag) and prunes removed ones. If an entry carries `sha512` (Libraria servers know it), it links to the existing book directly.
 - `openBook(bookId, services, { signal, onStage })` in `lib/library/open.ts` resolves a readable Blob: offline copy → local source → download (into OPFS when `autoDownloadOnOpen` allows, honouring `downloadOnMetered`), then hashes and analyses placeholders and merges them into an existing book with the same SHA-512. `keepOffline()` downloads and pins. Progress stages drive the reader's loading UI.
 - `importFiles(files, services)` for anything the user picks from their device.
+- `scanner` (`lib/stores/scanner.svelte.ts`) for background scans with progress and per-source problems; `scanRoots()` scans only the folders libraries use.
+- `SourceError` (`sources/errors.ts`) with a `code` the UI acts on: `auth` → "Sign in again", `permission` → "Grant access", `network` + `corsHelp` → CORS help. Show messages through `errorMessage(err, config)`, which redacts the config's secrets.
+- `resumableStream()` (`sources/http.ts`) for downloads that resume with `Range` after a dropped connection.
+
+Built-in remote/device drivers:
+
+| Kind | Paths | Notes |
+|---|---|---|
+| `folder` | relative to the picked folder | File System Access (Chromium). Handle stored under `settings` key `folder:handle:<handleId>`; permission is re-requested only from a click (`requestFolderAccess`). `isLocal`: read in place, copied only by "Keep a copy". Device-only. |
+| `webdav` | decoded, relative to the configured URL | PROPFIND Depth 1, Basic auth (UTF-8). Needs CORS on the server; `CorsHelp.svelte` explains it. |
+| `gdrive` | chains of Drive file ids; names in `displayPath` | OAuth token flow (`drive.readonly`), about an hour per sign-in, re-auth tries `prompt=none` first. Client ID in `SyncedSettings.oauth.googleClientId`. |
+| `dropbox` | display paths relative to `rootPath` | OAuth code flow + PKCE, `token_access_type=offline`; refreshed tokens are written back to the source. App key in `SyncedSettings.oauth.dropboxAppKey`. |
+
+OAuth: `oauth.ts` stores the pending request (`state`, PKCE verifier, route to return to) in localStorage and navigates the whole page to the provider. `oauth-capture.ts`, imported first in `main.ts`, takes the response out of the URL before the hash router starts, checks `state` and restores the route; `finishSignIn()` (startup hook in `features/sources.ts`) turns it into tokens. The redirect URI to register is the app's origin + path (shown with a copy button in Settings › Cloud storage).
+
+Removed files: a rescan that no longer finds a file deletes its `bookFiles` row only if the book is still somewhere else. Otherwise the row stays with `missing: true`, so the book keeps its place in its libraries, readable from an offline copy or shown as unavailable. Progress and bookmarks are never touched.
 
 ### Libraria server integration
 
@@ -105,7 +122,8 @@ All three share `ReaderChrome.svelte` (top bar with back, bookmark toggle, conte
 
 ## Not done yet
 
-- Real drivers for folder, WebDAV, Google Drive, Dropbox and Libraria servers (stubs show "coming soon").
+- The Libraria server source kind (stub shows "coming soon").
+- Google Drive and Dropbox are covered by mocked unit tests and a mocked sign-in e2e only; they have not been run against the real services.
 - EPUB positions use spine + progression, not CFI (the plan mentions CFI).
 - The "Readable" font uses OpenDyslexic / Atkinson Hyperlegible only if installed; no font files are bundled.
 - Fixed-layout EPUBs and vertical writing are rendered as reflowable text.

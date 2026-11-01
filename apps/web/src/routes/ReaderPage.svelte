@@ -9,8 +9,7 @@
   import type { ReaderProps } from '../lib/readers/types';
   import { href, router } from '../lib/router.svelte';
   import { services } from '../lib/services';
-  import type { Source } from '@libraria/core';
-  import { folderAccess, requestFolderAccess } from '../lib/sources/folder';
+  import SourceFixes from '../lib/sources/ui/SourceFixes.svelte';
   import { catalog } from '../lib/stores/catalog.svelte';
   import BookCover from '../lib/ui/BookCover.svelte';
   import Icon from '../lib/ui/Icon.svelte';
@@ -68,24 +67,8 @@
         message: err instanceof Error ? err.message : String(err),
         reason: err instanceof BookUnavailableError ? err.reason : 'failed',
       };
-      needsAccess = await foldersWithoutAccess();
     }
   });
-
-  // A linked folder that lost its permission: asking again needs this click.
-  let needsAccess = $state<Source[]>([]);
-  async function foldersWithoutAccess(): Promise<Source[]> {
-    const s = services();
-    const ids = new Set(catalog.files.filter((f) => f.bookId === params.id && !f.missing).map((f) => f.sourceId));
-    const out: Source[] = [];
-    for (const src of catalog.sources) {
-      if (ids.has(src.id) && src.config.kind === 'folder' && (await folderAccess(s.repo, src)) === 'prompt') out.push(src);
-    }
-    return out;
-  }
-  async function grant(src: Source) {
-    if (await requestFolderAccess(services().repo, src)) location.reload();
-  }
 
   const flush = () => void saver?.flush();
   const onVisibility = () => {
@@ -148,13 +131,10 @@
           <p>{failure.message}</p>
           <div class="row">
             <button class="btn" type="button" onclick={back}>Back</button>
-            {#each needsAccess as src (src.id)}
-              <button class="btn primary" type="button" onclick={() => grant(src)}>Grant access to {src.name}</button>
-            {:else}
-              {#if failure.reason !== 'missing'}
-                <button class="btn primary" type="button" onclick={() => location.reload()}>Try again</button>
-              {/if}
-            {/each}
+            {#if failure.reason !== 'missing'}
+              <button class="btn primary" type="button" onclick={() => location.reload()}>Try again</button>
+            {/if}
+            <SourceFixes bookId={params.id ?? ''} onfixed={() => location.reload()} />
           </div>
         </div>
       {:else}
@@ -233,6 +213,8 @@
   }
   .row {
     display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
     gap: 8px;
   }
   .failure .btn:not(.primary) {
