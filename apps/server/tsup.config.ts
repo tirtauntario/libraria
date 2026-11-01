@@ -8,6 +8,8 @@ export default defineConfig({
   outDir: 'dist',
   clean: true,
   sourcemap: true,
+  // node:sqlite only exists with the prefix; never rewrite it to 'sqlite'.
+  removeNodeProtocol: false,
   // Core is workspace TS source: bundle it (and its pure-JS deps) so dist runs
   // with only the runtime dependencies listed in package.json.
   noExternal: ['@libraria/core'],

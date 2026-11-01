@@ -4,6 +4,7 @@ import { lstat, open, opendir, realpath, stat } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import {
   detectFormat,
+  detectFormatStrict,
   FORMAT_HEAD_BYTES,
   isBookFilename,
   sha512,
@@ -94,7 +95,9 @@ export async function scanSource(ctx: AppContext, source: SourceRow): Promise<Sc
         continue;
       }
       const name = basename(path);
-      const format = detectFormat(name, await head(path));
+      // Magic bytes must match a known format; the name only refines ZIP (EPUB vs CBZ).
+      const h = await head(path);
+      const format = detectFormatStrict(h) ? detectFormat(name, h) : null;
       if (!format) {
         result.failed++;
         continue;

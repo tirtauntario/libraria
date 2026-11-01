@@ -197,8 +197,9 @@ export async function upload(t: TestServer, token: string, data: Buffer, opts: U
 }
 
 /** supertest parser that collects any response body as a Buffer. */
-export function binary(res: NodeJS.ReadableStream, cb: (err: Error | null, body: Buffer) => void): void {
+export function binary(res: request.Response, cb: (err: Error | null, body: Buffer) => void): void {
   const chunks: Buffer[] = [];
-  res.on('data', (c: Buffer) => chunks.push(c));
-  res.on('end', () => cb(null, Buffer.concat(chunks)));
+  const stream = res as unknown as NodeJS.ReadableStream;
+  stream.on('data', (c: Buffer) => chunks.push(c));
+  stream.on('end', () => cb(null, Buffer.concat(chunks)));
 }
