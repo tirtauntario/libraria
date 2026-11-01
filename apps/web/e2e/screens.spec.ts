@@ -86,4 +86,46 @@ test('pages and panels', async ({ page }) => {
   await page.mouse.move(300, 300);
   await page.getByRole('button', { name: 'Reading settings' }).click();
   await shot(page, 'comic-settings-desktop');
+
+  // Other layouts: comic spread and scroll, PDF pages, EPUB scroll.
+  await page.getByRole('checkbox', { name: /Two-page spreads/ }).check();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('img', { name: 'Page 2' })).toBeVisible();
+  await expect(page.getByRole('img', { name: 'Page 3' })).toBeVisible();
+  await shot(page, 'comic-spread-desktop');
+  await page.mouse.move(310, 310);
+  await page.getByRole('button', { name: 'Reading settings' }).click();
+  await page.getByRole('radio', { name: 'Scroll' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('img', { name: 'Page 4' })).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await shot(page, 'comic-scroll-mobile');
+  await page.setViewportSize({ width: 1280, height: 820 });
+
+  await page.goto('./#/');
+  await page.getByRole('link', { name: 'Read Field Notes on Paper' }).click();
+  await expect(page.locator('canvas[aria-label="Page 1"]')).toBeVisible();
+  await page.mouse.move(300, 300);
+  await page.getByRole('button', { name: 'Reading settings' }).click();
+  await page.getByRole('radio', { name: 'Pages' }).click();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('canvas[aria-label="Page 2"]')).toBeVisible();
+  await expect(page.locator('.pdf-text-layer')).toContainText('Chapter 2');
+  await shot(page, 'pdf-paged-desktop');
+
+  await page.goto('./#/');
+  await page.getByRole('link', { name: 'Read The Reading Room' }).click();
+  const frame = page.frameLocator('iframe[title="Book text"]');
+  await expect(frame.locator('h1')).toBeVisible();
+  await page.mouse.move(300, 300);
+  await page.getByRole('button', { name: 'Reading settings' }).click();
+  await page.getByRole('radio', { name: 'Scroll' }).click();
+  await page.getByRole('radio', { name: 'dark' }).click();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Space');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(frame.locator('h1')).toBeVisible();
+  await shot(page, 'epub-scroll-dark-mobile');
 });
