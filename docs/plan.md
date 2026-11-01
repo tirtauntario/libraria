@@ -25,7 +25,12 @@ The client can use, at the same time:
 | Sources | Local files, WebDAV, Google Drive, Dropbox, Libraria server, more later. |
 | Server | Optional. Node.js + Express. SQLite, upgradeable to MySQL/Postgres. |
 | Client | Svelte. UI is a rewrite; logic is ported from omni-reader. |
-| Roles (server library) | Owner: manages library, creates curators. Curator: manages library. Member: read only. No server-wide admin. |
+| Library per server | Exactly one. The server *is* the library. Only the owner creates it (at server setup). |
+| Roles | Owner: everything, including curators and server settings. Curator: add/edit/remove books, accept signups. Member: read and download. |
+| Visibility | Public or private. In a private library, owner or curator must accept each signup. |
+| Offline for members | Members can download any book for offline reading. Required. |
+| Personal sync | Progress, bookmarks, library and source configuration. End-to-end encrypted; the server cannot read it. |
+| License | AGPL-3.0-or-later. |
 | Identity | Primary keys are UUIDv7. Book uniqueness is the file's SHA-512. |
 | Distribution | Self-hosted, decentralized. Anyone can run a server. No central service. |
 
@@ -71,7 +76,8 @@ pnpm workspaces, same layout as omni-reader.
 
 ### Server
 
-- Hosts community libraries: users, libraries, members with roles, server-side storage sources, scanning, covers.
+- Hosts one community library: users with roles, server-side storage sources, uploads, scanning, covers.
+- Serves book files with HTTP Range support, so member downloads can resume.
 - Computes SHA-512 at scan time and exposes it, so clients get identity without downloading.
 - Stores personal sync data for users who pick it as sync home.
 - Bearer tokens, not cookies (client may run on another origin; third-party cookies are blocked). CORS open to configured client origins.
@@ -101,10 +107,13 @@ Decentralized: servers are independent and never talk to each other. The client 
 - `GET /api/info` returns name, server id, API version and capabilities. Version the API (`/api/v1`): servers and clients update independently.
 - Join a server with an invite link containing the server URL and an invite token. No central directory.
 
-### Accounts and operator
+### Accounts and ownership
 
-- Accounts exist per server. There is no global identity. A user may run a personal server just as a sync home.
-- **Operator.** A server still needs someone to control registration and which server-local disk paths can become sources. Letting any library owner attach paths like `/etc` would expose the host. Make the operator a config-file setting (the person who runs the process), not an in-app role.
+- Accounts exist per server. There is no global identity. A user may run a personal (private, empty) server just as a sync home.
+- **Owner is set at first run.** The server prints a one-time setup token to the console. Whoever has console access uses it to create the owner account and the library. This stops the first visitor from claiming a fresh server.
+- **Only the owner adds sources.** Server-local disk paths and server-side cloud credentials come from the person running the host. Letting curators attach paths like `/etc` would expose it. Curators add books by uploading them and edit metadata.
+- **Signups.** Public library: signups are active immediately. Private library: signups wait as `pending` until an owner or curator accepts or rejects them.
+- **Members download freely.** Books are DRM-free once downloaded. Owners should understand that publishing a book to members means members can copy it.
 
 ### Cloud storage OAuth without a central app
 
@@ -124,6 +133,21 @@ Servers are run by strangers. Treat all server content and metadata as untrusted
 - Progress: one record per (user, sha512), last-write-wins on `updated_at`.
 - Bookmarks/notes: add-only with soft delete (`deleted_at`), merged by UUID.
 - Positions: page number for comics and PDF; EPUB CFI for EPUB (chapter index + scroll offset does not survive font or layout changes).
+
+### End-to-end encrypted sync
+
+All personal sync data is encrypted in the client. The sync-home server stores opaque blobs only. This covers progress, bookmarks, notes, libraries, sources and source credentials.
+
+- **Keys** (Bitwarden-style):
+  - `master_key = Argon2id(password, salt)`, computed in the client (WASM).
+  - The client sends only `auth_hash = HKDF(master_key, "auth")` to log in. The server never sees the password or `master_key`.
+  - A random `data_key` encrypts all sync data (AES-256-GCM, WebCrypto). The server stores `data_key` wrapped by `master_key`.
+  - Changing the password re-wraps `data_key`. Data is not re-encrypted.
+  - Show a **recovery key** once at setup (`data_key` wrapped by a random key the user writes down). Without password or recovery key, the data is gone: the server cannot reset it.
+- **Hide which books a user reads.** Records refer to books by `HMAC(data_key, sha512)`, not raw `sha512`, so the server cannot match sync records to its own books.
+- **Record shape the server sees**: `id` (UUIDv7), `kind` (`progress` | `bookmark` | `config`), `ref` (the HMAC), `rev` (server-assigned, increasing), `deleted`, `ciphertext`.
+- **Merging happens in the client.** The server cannot read `updated_at`. Clients pull everything since their last `rev`, decrypt, merge (progress last-write-wins, bookmarks by UUID), and push results. Pushes carry the `rev` they are based on; the server rejects stale writes so the client re-merges.
+- These apply only to the sync-home account. Accounts on other servers use ordinary login.
 
 ### SHA-512 cost
 
@@ -151,11 +175,12 @@ Client (IndexedDB stores) and server (SQLite tables) share these shapes in `pack
 
 **Server**
 
-- `users` — id, username, password_hash, created_at
-- `libraries` — id, name, created_at
-- `library_members` — id, library_id, user_id, role (`owner` | `curator` | `member`)
-- `sources`, `library_sources`, `books`, `book_files` — as client
-- `progress`, `bookmarks` — as client, plus user_id
+- `server` — single row: id, name, visibility (`public` | `private`), created_at
+- `users` — id, username, auth_hash, kdf_salt, kdf_params, role (`owner` | `curator` | `member`), status (`pending` | `active` | `rejected` | `disabled`), created_at
+- `invites` — id, token_hash, created_by, expires_at, used_by
+- `sources`, `books`, `book_files` — as client (no `libraries`: the server is the library)
+- `sync_keys` — user_id, wrapped_data_key, wrapped_recovery_key
+- `sync_records` — id, user_id, kind, ref, rev, deleted, ciphertext, updated_at
 
 ## Build order
 
@@ -163,12 +188,11 @@ Client (IndexedDB stores) and server (SQLite tables) share these shapes in `pack
 2. Svelte PWA: local import, library view, comic + PDF readers, offline.
 3. EPUB reader with sandboxed rendering.
 4. WebDAV, Google Drive, Dropbox sources; libraries combining sources.
-5. Server: accounts, libraries, roles, scanning, book API.
-6. Client: connect to multiple servers; sync home for progress and bookmarks.
+5. Server: first-run setup, accounts, roles, signups, sources, uploads, scanning, book API.
+6. Client: connect to multiple servers, download for offline.
+7. End-to-end encrypted sync home.
 
 ## Open questions
 
-1. Registration: open, invite-only, or operator's choice per server? Who may create a library: any registered user, or only the operator?
-2. Should the sync home also sync the user's library and source configuration? If yes, source credentials (WebDAV passwords, OAuth tokens) need to be excluded or end-to-end encrypted.
-3. Can members download books for offline reading, or read online only? Offline being mandatory suggests download.
-4. Open-source license: MIT (anyone may reuse, including closed forks) or AGPL (modified hosted servers must publish their source).
+1. Public library: can anonymous visitors browse and read, or is an account always required?
+2. Do invite links bypass approval in a private library?
