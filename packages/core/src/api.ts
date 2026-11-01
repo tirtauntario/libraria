@@ -23,6 +23,18 @@ export interface ApiError {
   message: string;
 }
 
+/** 409 `duplicate` from POST /submissions: the file already exists here. */
+export interface DuplicateError extends ApiError {
+  error: 'duplicate';
+  bookId: string | null;
+  submissionId: string | null;
+}
+
+/** 409 `conflict` from PATCH /submissions/:id/content when Upload-Offset is wrong. */
+export interface UploadOffsetError extends ApiError {
+  offset: number;
+}
+
 export type ErrorCode =
   | 'bad_request'
   | 'unauthorized'
@@ -57,6 +69,8 @@ export interface ServerInfo {
   maxUploadBytes: number;
   allowedFormats: BookFormat[];
   capabilities: string[];
+  /** OAuth client ids this deployment registered, so clients need no build-time config. */
+  oauth?: { google: string | null; dropbox: string | null };
 }
 
 // --- Auth -------------------------------------------------------------------
@@ -241,6 +255,14 @@ export interface InviteDto {
   createdAt: number;
 }
 
+// POST /invites (owner, curator) -> InviteDto with token (shown once).
+// DELETE /invites/:id revokes an invite.
+
+/** GET /invites (owner, curator). token is never included. */
+export interface InviteListResponse {
+  items: InviteDto[];
+}
+
 /** GET /settings, PATCH /settings (owner) */
 export type SettingsDto = LibrarySettings;
 
@@ -252,6 +274,11 @@ export interface ServerSourceDto {
   path: string;
   lastScanAt: number | null;
   bookCount: number;
+}
+
+/** GET /sources (owner). Also GET/PATCH/DELETE /sources/:id. */
+export interface ServerSourceListResponse {
+  items: ServerSourceDto[];
 }
 
 /** POST /sources */

@@ -1,0 +1,40 @@
+{
+  "name": "@libraria/server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "license": "AGPL-3.0-or-later",
+  "description": "Libraria server: a self-hosted community library and sync home.",
+  "engines": {
+    "node": ">=24"
+  },
+  "bin": {
+    "libraria-server": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsup",
+    "start": "node dist/index.js",
+    "check": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "express": "5.3.0",
+    "kysely": "0.29.8"
+  },
+  "devDependencies": {
+    "@libraria/core": "workspace:*",
+    "@types/express": "5.0.6",
+    "@types/node": "26.6.6",
+    "@types/supertest": "7.2.1",
+    "@zip.js/zip.js": "2.24.0",
+    "supertest": "7.3.1",
+    "tsup": "9.0.0",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "vitest": "5.0.5"
+  }
+}

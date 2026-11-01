@@ -1,0 +1,18 @@
+import { defineConfig } from 'tsup';
+
+export default defineConfig({
+  entry: ['src/index.ts'],
+  format: ['esm'],
+  platform: 'node',
+  target: 'node24',
+  outDir: 'dist',
+  clean: true,
+  sourcemap: true,
+  // Core is workspace TS source: bundle it (and its pure-JS deps) so dist runs
+  // with only the runtime dependencies listed in package.json.
+  noExternal: ['@libraria/core'],
+  banner: {
+    // Bundled CommonJS deps may call require().
+    js: "import { createRequire as __librariaCreateRequire } from 'node:module'; const require = __librariaCreateRequire(import.meta.url);",
+  },
+});
