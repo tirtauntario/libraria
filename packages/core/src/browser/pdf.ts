@@ -5,6 +5,13 @@ import { canvasToBlob, makeCanvas } from './image';
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
+export interface PdfOutlineItem {
+  title: string;
+  /** 0-based page index, or null if the destination could not be resolved. */
+  page: number | null;
+  items: PdfOutlineItem[];
+}
+
 export class PdfDocument {
   private constructor(
     private readonly task: PDFDocumentLoadingTask,
@@ -27,19 +34,31 @@ export class PdfDocument {
     return this.doc.getPage(pageIndex + 1);
   }
 
-  async getOutline(): Promise<{ title: string; page: number | null; items: unknown[] }[]> {
+  /** Outline (bookmarks) with 0-based page indexes, nested items resolved too. */
+  async getOutline(): Promise<PdfOutlineItem[]> {
     const outline = await this.doc.getOutline();
     if (!outline) return [];
     const resolve = async (dest: unknown): Promise<number | null> => {
       try {
         const explicit = typeof dest === 'string' ? await this.doc.getDestination(dest) : dest;
-        if (!Array.isArray(explicit) || !explicit[0]) return null;
+        if (!Array.isArray(explicit) || explicit[0] == null) return null;
+        // A destination names its page by reference, or (rarely) by index.
+        if (typeof explicit[0] === 'number') return explicit[0];
         return await this.doc.getPageIndex(explicit[0]);
       } catch {
         return null;
       }
     };
-    return Promise.all(outline.map(async (o) => ({ title: o.title, page: await resolve(o.dest), items: o.items })));
+    type Node = { title: string; dest: unknown; items?: Node[] };
+    const walk = (nodes: Node[], depth: number): Promise<PdfOutlineItem[]> =>
+      Promise.all(
+        nodes.map(async (o) => ({
+          title: o.title,
+          page: await resolve(o.dest),
+          items: depth < 8 && o.items?.length ? await walk(o.items, depth + 1) : [],
+        })),
+      );
+    return walk(outline as Node[], 0);
   }
 
   async renderThumbnail(pageIndex = 0, maxSize = 360): Promise<Blob> {

@@ -308,7 +308,12 @@ export class EpubBook {
         return;
       }
       const url = await this.blobUrl(resolvePath(baseDir, splitFragment(value)[0]));
-      if (!url) return;
+      if (!url) {
+        // Missing from the archive: drop it rather than let it resolve against the app origin.
+        el.removeAttribute(attr);
+        if (ns) el.removeAttributeNS(ns, attr);
+        return;
+      }
       if (ns) {
         el.setAttributeNS(ns, `xlink:${attr}`, url);
         el.setAttribute(attr, url);
