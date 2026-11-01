@@ -8,6 +8,8 @@ Libraria is an offline-first EPUB, PDF and comic reader delivered as a PWA. It w
 
 A **Libraria server** is optional. It acts as a community library: an owner shares books with members who read them. A server can also act as a user's **sync home** for personal data (progress, bookmarks, other reading metadata).
 
+Libraria is **not SaaS**. There is no central service. Anyone can run their own server, and the client connects to any servers the user chooses.
+
 The client can use, at the same time:
 
 - many libraries,
@@ -25,7 +27,7 @@ The client can use, at the same time:
 | Client | Svelte. UI is a rewrite; logic is ported from omni-reader. |
 | Roles (server library) | Owner: manages library, creates curators. Curator: manages library. Member: read only. No server-wide admin. |
 | Identity | Primary keys are UUIDv7. Book uniqueness is the file's SHA-512. |
-| Hosting | Not decided. |
+| Distribution | Self-hosted, decentralized. Anyone can run a server. No central service. |
 
 ## Reuse from existing repos
 
@@ -74,6 +76,45 @@ pnpm workspaces, same layout as omni-reader.
 - Stores personal sync data for users who pick it as sync home.
 - Bearer tokens, not cookies (client may run on another origin; third-party cookies are blocked). CORS open to configured client origins.
 - Must be reachable over HTTPS: an HTTPS-hosted PWA cannot call `http://192.168.x.x` (mixed content). Option: the server also serves the PWA bundle, so a self-hosted server works same-origin.
+
+## Distribution
+
+Decentralized: servers are independent and never talk to each other. The client is the only place where libraries, sources and servers come together. Nothing is federated.
+
+### Running a server
+
+- One Node process plus one SQLite file. No external services required.
+- Ship as `npx libraria-server`, a Docker image, and possibly a single executable (Node SEA).
+- No native dependencies, so it runs on a Raspberry Pi, a NAS or a VPS without build tools. Use the built-in `node:sqlite` module instead of better-sqlite3. Make covers with WASM or pure JS instead of sharp.
+- Configure with a config file and environment variables. Data lives in one directory, so backups are a copy.
+- **HTTPS is required, not optional.** Service workers (offline, install) only run in a secure context, and an HTTPS client cannot call an HTTP server. Document three paths: Caddy (automatic certificates), Tailscale (`*.ts.net` certificates), Cloudflare Tunnel.
+
+### Where the client comes from
+
+- Every server serves the PWA bundle, so `https://my-server` opens a working app with no other hosting.
+- Also publish the same build as a static site (GitHub Pages or similar). It's a plain file host with no backend, so it isn't SaaS. Users without a server use it, or they host the static files themselves.
+- **Origin matters.** IndexedDB and OPFS are tied to the origin. Opening the app from server A and from server B gives two separate local libraries. Tell users to pick one origin as their app and add other servers inside it. That's also why cross-origin access (CORS, bearer tokens) is required even when every server serves the client.
+
+### Server identity and compatibility
+
+- A server is identified by its URL plus a server UUIDv7 created on first run, so the client can detect a server that moved or was replaced.
+- `GET /api/info` returns name, server id, API version and capabilities. Version the API (`/api/v1`): servers and clients update independently.
+- Join a server with an invite link containing the server URL and an invite token. No central directory.
+
+### Accounts and operator
+
+- Accounts exist per server. There is no global identity. A user may run a personal server just as a sync home.
+- **Operator.** A server still needs someone to control registration and which server-local disk paths can become sources. Letting any library owner attach paths like `/etc` would expose the host. Make the operator a config-file setting (the person who runs the process), not an in-app role.
+
+### Cloud storage OAuth without a central app
+
+- Google and Dropbox client IDs are bound to redirect origins. With no central service, each deployment registers its own app. Clients read the IDs from `/api/info` or from build-time config.
+- Google's `drive.readonly` scope is restricted. A public app needs verification, and an unverified app is capped at 100 users. Self-hosters can stay in testing mode for personal use. `drive.file` with the Google Picker avoids verification but only covers files the user explicitly picks; test whether that is enough for library folders.
+- Each server's tokens are scoped to that server and never sent to another. Drive and Dropbox credentials stay in the client unless the user adds that storage as a server-side source.
+
+### Trust
+
+Servers are run by strangers. Treat all server content and metadata as untrusted: sandboxed EPUB rendering, sanitized metadata, and size limits on downloads and covers.
 
 ## Identity and sync
 
@@ -127,7 +168,7 @@ Client (IndexedDB stores) and server (SQLite tables) share these shapes in `pack
 
 ## Open questions
 
-1. How do users join a server: open registration, invite links, or created by an owner? With no server admin, who may create a library?
+1. Registration: open, invite-only, or operator's choice per server? Who may create a library: any registered user, or only the operator?
 2. Should the sync home also sync the user's library and source configuration? If yes, source credentials (WebDAV passwords, OAuth tokens) need to be excluded or end-to-end encrypted.
 3. Can members download books for offline reading, or read online only? Offline being mandatory suggests download.
-4. Hosting for the PWA and the server (affects OAuth redirect URIs and HTTPS).
+4. Open-source license: MIT (anyone may reuse, including closed forks) or AGPL (modified hosted servers must publish their source).
