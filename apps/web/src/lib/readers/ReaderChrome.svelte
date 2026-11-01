@@ -218,9 +218,9 @@
     --bar-border: rgb(255 255 255 / 0.08);
   }
   .tone-dim {
-    --bar-bg: rgb(43 45 44 / 0.9);
-    --bar-fg: #d9d5ce;
-    --bar-sub: rgb(217 213 206 / 0.65);
+    --bar-bg: rgb(59 61 60 / 0.9);
+    --bar-fg: #dedad3;
+    --bar-sub: rgb(222 218 211 / 0.65);
     --bar-border: rgb(255 255 255 / 0.07);
   }
   .tone-light {

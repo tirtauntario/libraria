@@ -104,22 +104,22 @@
 
 :root[data-theme='dim'] {
   color-scheme: dark;
-  --bg: #2b2d2c;
-  --bg-elevated: #333634;
-  --surface: #333634;
-  --surface-2: #3a3d3b;
-  --surface-3: #444845;
-  --border: #434745;
-  --border-strong: #555a57;
-  --text: #d9d5ce;
-  --text-2: #aaa59d;
-  --text-3: #9a958d;
+  --bg: #3b3d3c;
+  --bg-elevated: #434644;
+  --surface: #434644;
+  --surface-2: #4a4d4b;
+  --surface-3: #545856;
+  --border: #525654;
+  --border-strong: #646967;
+  --text: #dedad3;
+  --text-2: #bdb8b0;
+  --text-3: #aea9a1;
   --accent: #7cc4ad;
   --accent-hover: #93d3be;
-  --accent-soft: #33473f;
+  --accent-soft: #405249;
   --accent-text: #0d1f1a;
   --danger: #f08378;
-  --danger-soft: #4a3330;
+  --danger-soft: #57403c;
   --warning: #e0b05a;
   --success: #79c79a;
   --focus: #8fd6bf;

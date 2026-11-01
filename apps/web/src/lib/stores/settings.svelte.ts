@@ -10,7 +10,7 @@ import type { Repo } from '../db/repo';
 export type AppTheme = 'system' | 'light' | 'dim' | 'dark';
 const THEME_KEY = 'libraria:theme';
 /** Must match --bg in app.css (and the pre-paint script in index.html). */
-const THEME_COLORS: Partial<Record<AppTheme, string>> = { light: '#f7f5f0', dim: '#2b2d2c', dark: '#121514' };
+const THEME_COLORS: Partial<Record<AppTheme, string>> = { light: '#f7f5f0', dim: '#3b3d3c', dark: '#121514' };
 
 function readTheme(): AppTheme {
   try {
