@@ -71,7 +71,17 @@ class CatalogState {
   onDeviceIds = $derived.by(() => {
     const local = new Set(this.sources.filter((s) => DEVICE_ONLY_SOURCES.includes(s.config.kind)).map((s) => s.id));
     const ids = new Set(this.offline.keys());
-    for (const f of this.files) if (local.has(f.sourceId)) ids.add(f.bookId);
+    for (const f of this.files) if (local.has(f.sourceId) && !f.missing) ids.add(f.bookId);
+    return ids;
+  });
+
+  /** Books whose every file was removed from its source and that have no offline copy. */
+  unavailableIds = $derived.by(() => {
+    const present = new Set<string>();
+    const missing = new Set<string>();
+    for (const f of this.files) (f.missing ? missing : present).add(f.bookId);
+    const ids = new Set<string>();
+    for (const id of missing) if (!present.has(id) && !this.offline.has(id)) ids.add(id);
     return ids;
   });
 

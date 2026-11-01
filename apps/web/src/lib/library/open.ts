@@ -53,6 +53,7 @@ async function locate(bookId: string, s: Services): Promise<{ local: Located[]; 
   const remote: Located[] = [];
   const errors: string[] = [];
   for (const file of await s.repo.listBookFiles(bookId)) {
+    if (file.missing) continue;
     const source = await s.repo.getSource(file.sourceId);
     if (!source || source.deleted) continue;
     try {
@@ -63,6 +64,11 @@ async function locate(bookId: string, s: Services): Promise<{ local: Located[]; 
     }
   }
   return { local, remote, errors };
+}
+
+/** The file's name for format detection and titles (Drive paths are ids). */
+export function fileName(file: Pick<BookFileRecord, 'path' | 'displayPath'>): string {
+  return (file.displayPath || file.path).split('/').pop() ?? file.path;
 }
 
 export function offlineName(id: string, book: Pick<BookRecord, 'format'>): string {
@@ -112,11 +118,14 @@ export async function keepOffline(bookId: string, s: Services, opts: OpenOptions
     return { ...existing, pinned: true };
   }
   const { local, remote } = await locate(bookId, s);
-  if (local.length) return null;
-  if (!remote[0]) throw new BookUnavailableError('No source has this book.', 'no-source');
-  if (!isOnline()) throw new BookUnavailableError('You are offline.', 'offline');
-  const { record, blob } = await downloadToStore(book, remote[0], s, { ...opts, pinned: true });
-  await identify(book, blob, remote[0].file.path, s, opts);
+  // Imported books are already in the file store. A linked folder can lose
+  // its permission or be unplugged, so pinning copies it in.
+  if (local.some((l) => l.source.config.kind === 'local')) return null;
+  const from = local[0] ?? remote[0];
+  if (!from) throw new BookUnavailableError('No source has this book.', 'no-source');
+  if (!from.driver.isLocal && !isOnline()) throw new BookUnavailableError('You are offline.', 'offline');
+  const { record, blob } = await downloadToStore(book, from, s, { ...opts, pinned: true });
+  await identify(book, blob, fileName(from.file), s, opts);
   return record;
 }
 
@@ -165,7 +174,7 @@ export async function openBook(bookId: string, s: Services, opts: OpenOptions = 
 
   const offline = await s.repo.getOffline(bookId);
   const files = await s.repo.listBookFiles(bookId);
-  const filename = files[0]?.path ?? `${book.title}.${book.format}`;
+  const filename = files[0] ? fileName(files[0]) : `${book.title}.${book.format}`;
 
   if (offline) {
     const blob = await s.files.read(offline.opfsName);
@@ -181,7 +190,7 @@ export async function openBook(bookId: string, s: Services, opts: OpenOptions = 
   for (const where of local) {
     try {
       const blob = await where.driver.read(where.file.path, { signal: opts.signal });
-      book = await identify(book, blob, where.file.path, s, opts);
+      book = await identify(book, blob, fileName(where.file), s, opts);
       return { book, blob, origin: 'local' };
     } catch (err) {
       errors.push(err instanceof Error ? err.message : String(err));
@@ -189,6 +198,9 @@ export async function openBook(bookId: string, s: Services, opts: OpenOptions = 
   }
 
   if (remote.length === 0) {
+    if (!errors.length && files.length && files.every((f) => f.missing)) {
+      throw new BookUnavailableError('This book was removed from its source, and there is no copy on this device.', 'no-source');
+    }
     throw new BookUnavailableError(errors[0] ?? 'This book is not stored anywhere this device can reach.', 'no-source');
   }
   if (!isOnline()) {
@@ -211,7 +223,7 @@ export async function openBook(bookId: string, s: Services, opts: OpenOptions = 
         });
         origin = 'stream';
       }
-      book = await identify(book, blob, where.file.path, s, opts);
+      book = await identify(book, blob, fileName(where.file), s, opts);
       return { book, blob, origin };
     } catch (err) {
       if ((err as Error)?.name === 'AbortError') throw err;

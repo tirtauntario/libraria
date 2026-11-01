@@ -9,6 +9,7 @@
   import type { ReaderProps } from '../lib/readers/types';
   import { href, router } from '../lib/router.svelte';
   import { services } from '../lib/services';
+  import SourceFixes from '../lib/sources/ui/SourceFixes.svelte';
   import { catalog } from '../lib/stores/catalog.svelte';
   import BookCover from '../lib/ui/BookCover.svelte';
   import Icon from '../lib/ui/Icon.svelte';
@@ -61,7 +62,7 @@
       };
     } catch (err) {
       if ((err as Error)?.name === 'AbortError') return;
-      console.error(err);
+      if (!(err instanceof BookUnavailableError)) console.error(err); // expected states are shown, not logged
       failure = {
         message: err instanceof Error ? err.message : String(err),
         reason: err instanceof BookUnavailableError ? err.reason : 'failed',
@@ -133,6 +134,7 @@
             {#if failure.reason !== 'missing'}
               <button class="btn primary" type="button" onclick={() => location.reload()}>Try again</button>
             {/if}
+            <SourceFixes bookId={params.id ?? ''} onfixed={() => location.reload()} />
           </div>
         </div>
       {:else}
@@ -211,6 +213,8 @@
   }
   .row {
     display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
     gap: 8px;
   }
   .failure .btn:not(.primary) {

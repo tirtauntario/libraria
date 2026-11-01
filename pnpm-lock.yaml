@@ -69,6 +69,9 @@ importers:
       '@types/node':
         specifier: 26.6.6
         version: 26.6.6
+      '@xmldom/xmldom':
+        specifier: 0.9.12
+        version: 0.9.12
       '@zip.js/zip.js':
         specifier: 2.24.0
         version: 2.24.0
@@ -1306,6 +1309,10 @@ packages:
 
   '@vitest/spy@5.0.5':
     resolution: {integrity: sha512-lwJRExuH417257Q5wv9QYugN9IMJkoxcrKrYxGPQkBzl7wlNpTUxD/5yNX4ESKVUIShKPgkGchYPFMWOOk0wzw==}
+
+  '@xmldom/xmldom@0.9.12':
+    resolution: {integrity: sha512-5AXjrcMClTryPe9LgZrygpB1lj7s0S9E0+W+AHaVKAVyHanafK86iPSvG5xHVSp/jC+VH1UXu0TAEmY279xH7A==}
+    engines: {node: '>=14.6'}
 
   '@zip.js/zip.js@2.24.0':
     resolution: {integrity: sha512-WlaVKzdqBK+RF3bdiXZWbdCnvGB6PdO4IHC1mn/2Yfl3bASgqUNegnU3+PNg61iecwoPfUi5BgLUPqBukXpyWw==}
@@ -4014,6 +4021,8 @@ snapshots:
       vite: 8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.15)
 
   '@vitest/spy@5.0.5': {}
+
+  '@xmldom/xmldom@0.9.12': {}
 
   '@zip.js/zip.js@2.24.0': {}
 

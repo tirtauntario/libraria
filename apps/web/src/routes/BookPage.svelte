@@ -24,6 +24,10 @@
   const onDevice = $derived(catalog.onDevice(params.id ?? ''));
   const hasLocalFile = $derived(files.some((f) => f.sourceId === catalog.localSourceId));
   const sourceName = (id: string) => catalog.sources.find((s) => s.id === id)?.name ?? 'Unknown source';
+  const sourceKind = (id: string) => catalog.sources.find((s) => s.id === id)?.config.kind;
+  const unavailable = $derived(catalog.unavailableIds.has(params.id ?? ''));
+  /** Only in a linked folder: offer to copy it in, in case the folder goes away. */
+  const folderOnly = $derived(!hasLocalFile && files.some((f) => !f.missing && sourceKind(f.sourceId) === 'folder'));
 
   let bookmarks = $state<Bookmark[]>([]);
   $effect(() => {
@@ -121,8 +125,14 @@
           {/if}
         </div>
 
+        {#if unavailable}
+          <p class="gone" role="status">
+            <Icon name="alert" size={18} /> This book was removed from its source and there is no copy on this device. Its progress and bookmarks are kept.
+          </p>
+        {/if}
+
         <div class="actions">
-          <a class="btn primary big" href={href('/read', book.id)}>
+          <a class="btn primary big" href={href('/read', book.id)} aria-disabled={unavailable}>
             <Icon name="book" size={18} />
             {book.percent ? 'Continue reading' : 'Start reading'}
           </a>
@@ -168,10 +178,10 @@
           <ul class="where">
             {#each files as f (f.id)}
               <li>
-                <Icon name={f.sourceId === catalog.localSourceId ? 'device' : 'cloud'} size={18} />
+                <Icon name={f.sourceId === catalog.localSourceId ? 'device' : sourceKind(f.sourceId) === 'folder' ? 'folder' : 'cloud'} size={18} />
                 <div>
-                  <p>{sourceName(f.sourceId)}</p>
-                  <p class="subtle small path">{f.path.split('/').pop()}</p>
+                  <p>{sourceName(f.sourceId)}{#if f.missing}<span class="chip warn">Removed from source</span>{/if}</p>
+                  <p class="subtle small path" title={f.displayPath || f.path}>{(f.displayPath || f.path).split('/').pop()}</p>
                 </div>
               </li>
             {/each}
@@ -197,7 +207,13 @@
               <button class="btn small" type="button" onclick={() => removeOfflineCopy(book.id, services())}>
                 Remove offline copy
               </button>
-            {:else if !onDevice}
+            {:else if folderOnly}
+              <p class="subtle small"><Icon name="check" size={14} /> In a folder on this device.</p>
+              <button class="btn small" type="button" onclick={download} disabled={downloading}>
+                <Icon name="download" size={16} />
+                {downloading ? 'Copying…' : 'Keep a copy in Libraria'}
+              </button>
+            {:else if !onDevice && !unavailable}
               <button class="btn small" type="button" onclick={download} disabled={downloading || !net.online}>
                 <Icon name="download" size={16} />
                 {downloading ? 'Downloading…' : 'Keep offline'}
@@ -254,6 +270,25 @@
 </Dialog>
 
 <style>
+  .gone {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    padding: 10px 12px;
+    margin: 0 0 12px;
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--warning) 12%, var(--surface));
+    font-size: 14px;
+  }
+  .gone :global(svg) {
+    flex: none;
+    color: var(--warning);
+    margin-top: 1px;
+  }
+  .chip.warn {
+    margin-left: 8px;
+    color: var(--warning);
+  }
   .page-header {
     margin-bottom: 8px;
   }

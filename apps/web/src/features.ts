@@ -7,4 +7,4 @@
  *   import './features/sync';     // end-to-end encrypted sync engine
  *   import './lib/sources/webdav';
  */
-export {};
+import './features/sources'; // folder, WebDAV, Google Drive, Dropbox: settings, sign-in, rescans

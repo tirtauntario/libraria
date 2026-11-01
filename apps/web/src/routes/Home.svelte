@@ -109,7 +109,7 @@
       <h2 id="recent" class="section-title">Recently added</h2>
       <div class="grid">
         {#each recent as book (book.id)}
-          <BookCard {book} remote={!catalog.onDevice(book.id)} />
+          <BookCard {book} remote={!catalog.onDevice(book.id)} unavailable={catalog.unavailableIds.has(book.id)} />
         {/each}
       </div>
     </section>
