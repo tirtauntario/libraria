@@ -28,6 +28,9 @@ The client can use, at the same time:
 | Library per server | Exactly one. The server *is* the library. Only the owner creates it (at server setup). |
 | Roles | Owner: everything, including curators and server settings. Curator: add/edit/remove books, accept signups. Member: read and download. |
 | Visibility | Public or private. In a private library, owner or curator must accept each signup. |
+| Client independence | Every client feature works offline with no server. Servers add sync and community libraries only. |
+| Connecting to a server | The client talks to a server only after the user registers there. |
+| Contributions | Members can submit books from their device. Owner or curator approves before members see them. Owner and curator add books directly. |
 | Offline for members | Members can download any book for offline reading. Required. |
 | Personal sync | Progress, bookmarks, library and source configuration. End-to-end encrypted; the server cannot read it. |
 | License | AGPL-3.0-or-later. |
@@ -73,6 +76,19 @@ pnpm workspaces, same layout as omni-reader.
   - Google Drive / Dropbox: OAuth PKCE in browser.
   - Libraria server: REST API with bearer token.
 - **Offline**: books are copied to OPFS on open or when pinned "keep offline". Call `navigator.storage.persist()`. Show quota usage. On iOS, offline storage is only reliable for the installed PWA.
+
+- **Independence rule**: hashing, metadata extraction, covers, grouping, reading and library management all run in the client. No feature may call a server unless the user registered on it.
+
+### Contributing books
+
+1. Member picks a book from their device and a registered server.
+2. Client sends the SHA-512 first. If the library already has it, or it is already pending, nothing is uploaded.
+3. Client uploads in chunks with resume. If offline, the submission is queued and sent when the app is next online (Background Sync exists only in Chromium, so also retry on app open).
+4. Server stores the file in a quarantine folder that members cannot see. It checks size limits, verifies the SHA-512, checks the format by magic bytes, parses the file, and sanitizes metadata.
+5. Owner or curator reviews: approve (book joins the library), or reject with an optional note. The member sees the status in the client.
+6. The submitter's local copy and the server copy share the SHA-512, so the client links them automatically.
+
+The approval step is also where the owner checks they have the right to share the book. Approved books can still be removed later.
 
 ### Server
 
@@ -178,6 +194,7 @@ Client (IndexedDB stores) and server (SQLite tables) share these shapes in `pack
 - `server` — single row: id, name, visibility (`public` | `private`), created_at
 - `users` — id, username, auth_hash, kdf_salt, kdf_params, role (`owner` | `curator` | `member`), status (`pending` | `active` | `rejected` | `disabled`), created_at
 - `invites` — id, token_hash, created_by, expires_at, used_by
+- `submissions` — id, user_id, sha512, format, title, author, file_size, upload_offset, status (`uploading` | `pending` | `approved` | `rejected`), reviewed_by, review_note, created_at, reviewed_at
 - `sources`, `books`, `book_files` — as client (no `libraries`: the server is the library)
 - `sync_keys` — user_id, wrapped_data_key, wrapped_recovery_key
 - `sync_records` — id, user_id, kind, ref, rev, deleted, ciphertext, updated_at
@@ -189,10 +206,11 @@ Client (IndexedDB stores) and server (SQLite tables) share these shapes in `pack
 3. EPUB reader with sandboxed rendering.
 4. WebDAV, Google Drive, Dropbox sources; libraries combining sources.
 5. Server: first-run setup, accounts, roles, signups, sources, uploads, scanning, book API.
-6. Client: connect to multiple servers, download for offline.
+6. Client: connect to multiple servers, download for offline, submit books; server review queue.
 7. End-to-end encrypted sync home.
 
 ## Open questions
 
 1. Public library: can anonymous visitors browse and read, or is an account always required?
 2. Do invite links bypass approval in a private library?
+3. Upload limits: per-file maximum and per-member quota, set by the owner? Any defaults?
