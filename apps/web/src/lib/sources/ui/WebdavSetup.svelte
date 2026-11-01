@@ -14,6 +14,7 @@
   let name = $state('');
   let status = $state<{ kind: 'idle' | 'testing' | 'ok' | 'error'; message?: string; cors?: boolean }>({ kind: 'idle' });
   let saving = $state(false);
+  const uid = $props.id();
 
   function driver(): WebdavDriver {
     const n = normalizeWebdavUrl(url);
@@ -57,7 +58,7 @@
     <span>Server address</span>
     <input
       class="input"
-      type="url"
+      type="text"
       inputmode="url"
       bind:value={url}
       oninput={() => (status = { kind: 'idle' })}
@@ -65,9 +66,10 @@
       required
       autocapitalize="off"
       spellcheck="false"
+      aria-describedby="{uid}-url-hint"
     />
-    <span class="hint">The folder to read. Nextcloud: …/remote.php/dav/files/USERNAME/</span>
   </label>
+  <p class="hint" id="{uid}-url-hint">The folder to read. Nextcloud: …/remote.php/dav/files/USERNAME/</p>
   <div class="two">
     <label class="field">
       <span>Username</span>
@@ -84,6 +86,11 @@
     <input class="input" bind:value={name} placeholder="e.g. Home NAS" />
   </label>
 
+  <div class="test">
+    <button class="btn small" type="button" onclick={test} disabled={!url || status.kind === 'testing'}>
+      {status.kind === 'testing' ? 'Testing…' : 'Test connection'}
+    </button>
+  </div>
   {#if status.kind === 'ok'}
     <p class="status ok" role="status"><Icon name="check" size={18} /> {status.message}</p>
   {:else if status.kind === 'error'}
@@ -97,9 +104,6 @@
   <div class="actions">
     <button class="btn" type="button" onclick={onCancel}>Back</button>
     <span class="spacer"></span>
-    <button class="btn" type="button" onclick={test} disabled={!url || status.kind === 'testing'}>
-      {status.kind === 'testing' ? 'Testing…' : 'Test connection'}
-    </button>
     <button class="btn primary" type="submit" disabled={!url || saving || status.kind === 'testing'}>Add source</button>
   </div>
 </form>
@@ -107,6 +111,7 @@
 <style>
   .form {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 14px;
   }
   .two {
@@ -119,9 +124,6 @@
     font-weight: 400;
     color: var(--text-3);
     margin: -6px 0 0;
-  }
-  .field .hint {
-    margin: 0;
   }
   .status {
     display: flex;
@@ -149,6 +151,9 @@
     gap: 8px;
     flex-wrap: wrap;
     align-items: center;
+  }
+  .test {
+    display: flex;
   }
   .spacer {
     flex: 1;

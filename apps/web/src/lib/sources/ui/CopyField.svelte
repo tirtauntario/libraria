@@ -18,7 +18,7 @@
 <div class="copy">
   <input class="input mono" readonly {value} aria-label={label} onfocus={(e) => e.currentTarget.select()} />
   <button class="btn small" type="button" onclick={copy} aria-label="Copy {label}">
-    <Icon name={copied ? 'check' : 'external'} size={16} />
+    <Icon name={copied ? 'check' : 'copy'} size={16} />
     {copied ? 'Copied' : 'Copy'}
   </button>
 </div>

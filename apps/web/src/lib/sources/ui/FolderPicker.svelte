@@ -114,6 +114,7 @@
 <style>
   .picker {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 10px;
   }
   .crumbs {

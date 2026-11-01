@@ -250,8 +250,7 @@
             <span>
               <span class="item-name">{src.name}</span>
               <span class="subtle small">
-                {kindLabel(src)}{#if sourceDetail(src) && src.config.kind !== 'local'}&nbsp;· {sourceDetail(src)}{/if} ·
-                {plural(filesPerSource.get(src.id) ?? 0, 'file')}
+                {plural(filesPerSource.get(src.id) ?? 0, 'file')} · {kindLabel(src)}{#if sourceDetail(src) && src.config.kind !== 'local'}&nbsp;· {sourceDetail(src)}{/if}
               </span>
             </span>
           </div>

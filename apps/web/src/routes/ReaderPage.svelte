@@ -63,7 +63,7 @@
       };
     } catch (err) {
       if ((err as Error)?.name === 'AbortError') return;
-      console.error(err);
+      if (!(err instanceof BookUnavailableError)) console.error(err); // expected states are shown, not logged
       failure = {
         message: err instanceof Error ? err.message : String(err),
         reason: err instanceof BookUnavailableError ? err.reason : 'failed',
