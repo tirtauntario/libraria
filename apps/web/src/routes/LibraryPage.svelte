@@ -8,7 +8,6 @@
   import BookRow from '../lib/ui/BookRow.svelte';
   import Dialog from '../lib/ui/Dialog.svelte';
   import Icon from '../lib/ui/Icon.svelte';
-  import Segmented from '../lib/ui/Segmented.svelte';
   import { plural } from '../lib/ui/format';
 
   let { params }: { params: Record<string, string> } = $props();
@@ -66,8 +65,8 @@
   }
 
   const SORTS: { value: LibrarySort; label: string }[] = [
-    { value: 'lastRead', label: 'Recently read' },
-    { value: 'added', label: 'Recently added' },
+    { value: 'lastRead', label: 'Last read' },
+    { value: 'added', label: 'Date added' },
     { value: 'name', label: 'Title' },
   ];
 </script>
@@ -115,7 +114,7 @@
         <div class="controls">
           <label class="visually-hidden" for="fmt">Format</label>
           <select id="fmt" class="input select" bind:value={format}>
-            <option value="all">All formats</option>
+            <option value="all">All</option>
             <option value="books">Books</option>
             <option value="comics">Comics</option>
             <option value="epub">EPUB</option>
@@ -142,16 +141,15 @@
           >
             <Icon name="layers" />
           </button>
-          <Segmented
-            label="View"
-            compact
-            value={lib.view}
-            onchange={(v) => settings.updateSynced((s) => (s.library.view = v))}
-            options={[
-              { value: 'grid', label: 'Grid', icon: 'grid', iconOnly: true },
-              { value: 'list', label: 'List', icon: 'list', iconOnly: true },
-            ]}
-          />
+          <button
+            class="icon-btn"
+            type="button"
+            aria-label={lib.view === 'grid' ? 'Show as list' : 'Show as grid'}
+            title={lib.view === 'grid' ? 'Show as list' : 'Show as grid'}
+            onclick={() => settings.updateSynced((s) => (s.library.view = s.library.view === 'grid' ? 'list' : 'grid'))}
+          >
+            <Icon name={lib.view === 'grid' ? 'list' : 'grid'} />
+          </button>
         </div>
       </div>
     {/if}
@@ -286,6 +284,18 @@
     min-height: 38px;
     padding: 6px 30px 6px 12px;
     font-size: 13.5px;
+  }
+  @media (max-width: 600px) {
+    .controls {
+      flex: 1 1 100%;
+      flex-wrap: nowrap;
+      min-width: 0;
+    }
+    .select {
+      flex: 1 1 0;
+      min-width: 0;
+      padding-right: 24px;
+    }
   }
   .group-actions {
     display: flex;

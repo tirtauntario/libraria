@@ -29,9 +29,11 @@
   <header class="page-header">
     <span class="mobile-logo"><Logo size={30} /></span>
     <h1>{catalog.books.length ? 'Reading' : 'Welcome'}</h1>
-    <button class="btn primary add" type="button" onclick={pickFiles} disabled={importer.busy}>
-      <Icon name="plus" size={18} /><span>Add books</span>
-    </button>
+    {#if catalog.books.length}
+      <button class="btn primary add" type="button" onclick={pickFiles} disabled={importer.busy}>
+        <Icon name="plus" size={18} /><span>Add books</span>
+      </button>
+    {/if}
   </header>
 
   {#if catalog.books.length === 0}

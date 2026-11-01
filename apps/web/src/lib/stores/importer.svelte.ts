@@ -1,6 +1,7 @@
 import { BOOK_EXTENSIONS } from '@libraria/core';
 import { importFiles, type ImportProgress, type ImportResult } from '../library/import';
 import { services } from '../services';
+import { isPersisted, requestPersistence } from '../storage/opfs';
 import { toasts } from './toasts.svelte';
 
 export const ACCEPT = [...BOOK_EXTENSIONS, 'application/epub+zip', 'application/pdf'].join(',');
@@ -63,6 +64,8 @@ class Importer {
         });
         const s = summarize(result);
         toasts.show(s.message, { kind: s.kind, detail: s.detail, timeout: s.kind === 'error' ? 10000 : 5000 });
+        // The first real import is the moment to ask the browser to keep our data.
+        if (result.added.length && (await isPersisted()) === false) void requestPersistence();
       }
     } catch (err) {
       toasts.error('Import failed', err instanceof Error ? err.message : String(err));

@@ -16,6 +16,7 @@ export const ICONS = {
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
   more: '<circle cx="5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="19" cy="12" r="1.2" fill="currentColor"/>',
   bookmark: '<path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/>',
+  bookmarks: '<path d="M9 3.5h9a1 1 0 0 1 1 1V19l-2-1.4"/><path d="M5 7.5h9a1 1 0 0 1 1 1V21l-5.5-3.6L4 21V8.5a1 1 0 0 1 1-1z"/>',
   'bookmark-filled': '<path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z" fill="currentColor"/>',
   toc: '<path d="M4 6h10M4 12h16M4 18h12"/><path d="M18 4v4M16 6h4" />',
   type: '<path d="M4 18 8.5 6h1L14 18M5.6 14h6.8"/><path d="M15.5 18c0-2 1-3 3-3s2.5 1 2.5 2.2V18M21 18c-1.4.1-5.5.6-5.5-1"/>',

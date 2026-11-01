@@ -135,7 +135,7 @@
     {/if}
     {#if bookmarks}
       <button class="icon-btn" type="button" aria-label="All bookmarks" title="Bookmarks" onclick={() => (panel = 'bookmarks')}>
-        <Icon name="list" />
+        <Icon name="bookmarks" />
       </button>
     {/if}
     <button class="icon-btn" type="button" aria-label="Reading settings" title="Settings" onclick={() => (panel = 'settings')}>

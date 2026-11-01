@@ -90,13 +90,13 @@ async function bytes(blob: Blob): Promise<Buffer> {
 
 // --- CBZ ---------------------------------------------------------------------
 
-export async function makeCbz(pages = 6): Promise<Buffer> {
+export async function makeCbz(pages = 6, number = 1, title = 'Seeds'): Promise<Buffer> {
   const zip = new ZipWriter(new BlobWriter('application/zip'));
   for (let i = pages; i >= 1; i--) await zip.add(`Pages/page-${String(i).padStart(2, '0')}.png`, new Uint8ArrayReader(comicPage(i)));
   await zip.add(
     'ComicInfo.xml',
     new TextReader(
-      '<?xml version="1.0"?><ComicInfo><Series>Night Garden</Series><Number>1</Number><Title>Seeds</Title><Writer>Mira Holt</Writer></ComicInfo>',
+      `<?xml version="1.0"?><ComicInfo><Series>Night Garden</Series><Number>${number}</Number><Title>${title}</Title><Writer>Mira Holt</Writer></ComicInfo>`,
     ),
   );
   return bytes(await zip.close());

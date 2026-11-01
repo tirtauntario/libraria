@@ -201,9 +201,10 @@ export async function openLibrariaDb(name = DB_NAME): Promise<Db> {
     upgrade(db, oldVersion, _newVersion, tx) {
       for (let v = oldVersion; v < DB_VERSION; v++) MIGRATIONS[v]!(db, tx);
     },
-    blocking() {
-      // A newer version of the app wants to upgrade: let it.
-      location.reload();
+    blocking(_current, _next, event) {
+      // A newer version of the app (another tab) wants to upgrade: step aside.
+      (event.target as IDBDatabase).close();
+      if (typeof location !== 'undefined') location.reload();
     },
   });
 }
