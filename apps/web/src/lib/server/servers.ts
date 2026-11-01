@@ -282,6 +282,49 @@ export async function refreshAccount(repo: Repo, source: LibrariaSource): Promis
   return patchServerState(repo, source.id, { info, infoAt: Date.now(), ...(user ? { user, sessionExpired: false } : {}) });
 }
 
+/**
+ * Change the account password. The server never sees either password; it
+ * gets auth hashes. On the sync home, `rewrap` returns the data key wrapped
+ * with the new master key so sync keeps working (data is not re-encrypted).
+ * Other sessions of the account are signed out by the server.
+ */
+export async function changePassword(
+  repo: Repo,
+  source: LibrariaSource,
+  current: string,
+  next: string,
+  opts: { rewrap?: (newMasterKey: Uint8Array) => Promise<string | null>; kdf?: KdfParams } = {},
+): Promise<void> {
+  const api = apiFor(source, repo);
+  const pre = await api.prelogin(source.config.username);
+  const { authHash: currentAuthHash } = await deriveKeys(current, pre.salt, pre.kdf);
+  const salt = randomSalt();
+  const kdf = opts.kdf ?? DEFAULT_KDF;
+  const fresh = await deriveKeys(next, salt, kdf);
+  const wrappedDataKey = opts.rewrap ? await opts.rewrap(fresh.masterKey) : null;
+  try {
+    await api.changePassword({ currentAuthHash, salt, kdf, authHash: fresh.authHash, wrappedDataKey });
+  } catch (err) {
+    // A wrong current password is a 401 here, not an expired session.
+    if (err instanceof ServerError && err.status === 401) {
+      await patchServerState(repo, source.id, { sessionExpired: false });
+      throw new ServerError('Your current password is wrong.', 401, 'unauthorized');
+    }
+    throw err;
+  }
+}
+
+/** Sign out: ends the session on the server and clears the token (on every synced device). */
+export async function signOut(repo: Repo, source: LibrariaSource): Promise<void> {
+  try {
+    if (source.config.token) await apiFor(source, repo).logout();
+  } catch {
+    // Already gone or unreachable; clearing the token is what matters here.
+  }
+  await repo.updateSource(source.id, { config: { ...source.config, token: '' } });
+  await patchServerState(repo, source.id, { user: null, sessionExpired: false });
+}
+
 /** The role the user has on a server, or null for a guest. */
 export function roleOf(source: LibrariaSource): Role | null {
   return source.config.token ? source.config.role : null;

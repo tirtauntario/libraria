@@ -7,4 +7,5 @@
  *   import './features/sync';     // end-to-end encrypted sync engine
  *   import './lib/sources/webdav';
  */
-export {};
+import './features/server'; // Libraria servers: join, browse, submit, admin, encrypted sync
+
