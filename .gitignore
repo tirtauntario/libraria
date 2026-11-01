@@ -7,3 +7,4 @@ coverage/
 /data/
 apps/server/data/
 *.tsbuildinfo
+.claude/
