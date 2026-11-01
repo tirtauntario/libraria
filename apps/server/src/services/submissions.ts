@@ -208,6 +208,7 @@ export async function approveSubmission(ctx: AppContext, sub: SubmissionRow, rev
     else await rename(part, abs);
 
     const authors = parseAuthors(sub.authors);
+    const newId = uuidv7();
     const values = {
       format: sub.format,
       title: sub.title,
@@ -223,21 +224,24 @@ export async function approveSubmission(ctx: AppContext, sub: SubmissionRow, rev
       submitted_by: sub.user_id,
       updated_at: now,
     };
-    const tomb = await ctx.db.selectFrom('books').select(['id', 'cover_ext']).where('sha512', '=', sub.sha512).executeTakeFirst();
-    if (tomb) {
-      bookId = tomb.id;
-      await ctx.db.updateTable('books').set({ ...values, deleted_at: null }).where('id', '=', bookId).execute();
-    } else {
-      bookId = uuidv7();
-      await ctx.db
-        .insertInto('books')
-        .values({ id: bookId, sha512: sub.sha512, cover_ext: null, added_at: now, deleted_at: null, ...values })
+    // Book row and file row land together so an orphan sweep never sees one without the other.
+    const tomb = await ctx.db.transaction().execute(async (trx) => {
+      const prev = await trx.selectFrom('books').select(['id', 'cover_ext']).where('sha512', '=', sub.sha512).executeTakeFirst();
+      if (prev) {
+        await trx.updateTable('books').set({ ...values, deleted_at: null }).where('id', '=', prev.id).execute();
+      } else {
+        await trx
+          .insertInto('books')
+          .values({ id: newId, sha512: sub.sha512, cover_ext: null, added_at: now, deleted_at: null, ...values })
+          .execute();
+      }
+      await trx
+        .insertInto('book_files')
+        .values({ id: uuidv7(), book_id: prev?.id ?? newId, source_id: null, path: rel, size: sub.file_size, mtime: now, removed_at: null, created_at: now })
         .execute();
-    }
-    await ctx.db
-      .insertInto('book_files')
-      .values({ id: uuidv7(), book_id: bookId, source_id: null, path: rel, size: sub.file_size, mtime: now, removed_at: null, created_at: now })
-      .execute();
+      return prev;
+    });
+    bookId = tomb?.id ?? newId;
     if (!tomb?.cover_ext) await saveExtractedCover(ctx, bookId, await extractFile(abs, sub.filename));
   }
 

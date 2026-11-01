@@ -104,52 +104,53 @@ export async function scanSource(ctx: AppContext, source: SourceRow): Promise<Sc
       }
       const hash = await sha512(createReadStream(path));
       const now = ctx.now();
-      let book = await ctx.db.selectFrom('books').select(['id']).where('sha512', '=', hash).executeTakeFirst();
-      if (!book) {
-        const extracted = await extractFile(path, name);
-        const meta = sanitizeMeta(extracted?.meta ?? { title: '', authors: [] }, titleFromFilename(name));
-        book = { id: uuidv7() };
-        await ctx.db
-          .insertInto('books')
-          .values({
-            id: book.id,
-            sha512: hash,
-            format,
-            title: meta.title,
-            authors: JSON.stringify(meta.authors),
-            series: meta.series,
-            series_index: meta.seriesIndex,
-            description: meta.description,
-            language: meta.language,
-            publisher: meta.publisher,
-            page_count: meta.pageCount,
-            file_size: st.size,
-            cover_ext: null,
-            search_text: searchText(meta.title, meta.authors, meta.series),
-            submitted_by: null,
-            added_at: now,
-            updated_at: now,
-            deleted_at: null,
-          })
-          .execute();
-        await saveExtractedCover(ctx, book.id, extracted);
-      }
-      if (prev) {
-        const same = prev.removed_at === null && prev.book_id === book.id;
-        await ctx.db
-          .updateTable('book_files')
-          .set({ book_id: book.id, size: st.size, mtime, removed_at: null })
-          .where('id', '=', prev.id)
-          .execute();
-        if (same) result.unchanged++;
-        else result.added++;
-      } else {
-        await ctx.db
-          .insertInto('book_files')
-          .values({ id: uuidv7(), book_id: book.id, source_id: source.id, path, size: st.size, mtime, removed_at: null, created_at: now })
-          .execute();
-        result.added++;
-      }
+      const existing = await ctx.db.selectFrom('books').select(['id']).where('sha512', '=', hash).executeTakeFirst();
+      const extracted = existing ? null : await extractFile(path, name);
+      const bookId = existing?.id ?? uuidv7();
+      // Book and file rows are written together so an orphan sweep never splits them.
+      await ctx.db.transaction().execute(async (trx) => {
+        if (!existing) {
+          const meta = sanitizeMeta(extracted?.meta ?? { title: '', authors: [] }, titleFromFilename(name));
+          await trx
+            .insertInto('books')
+            .values({
+              id: bookId,
+              sha512: hash,
+              format,
+              title: meta.title,
+              authors: JSON.stringify(meta.authors),
+              series: meta.series,
+              series_index: meta.seriesIndex,
+              description: meta.description,
+              language: meta.language,
+              publisher: meta.publisher,
+              page_count: meta.pageCount,
+              file_size: st.size,
+              cover_ext: null,
+              search_text: searchText(meta.title, meta.authors, meta.series),
+              submitted_by: null,
+              added_at: now,
+              updated_at: now,
+              deleted_at: null,
+            })
+            .execute();
+        }
+        if (prev) {
+          await trx
+            .updateTable('book_files')
+            .set({ book_id: bookId, size: st.size, mtime, removed_at: null })
+            .where('id', '=', prev.id)
+            .execute();
+        } else {
+          await trx
+            .insertInto('book_files')
+            .values({ id: uuidv7(), book_id: bookId, source_id: source.id, path, size: st.size, mtime, removed_at: null, created_at: now })
+            .execute();
+        }
+      });
+      if (!existing) await saveExtractedCover(ctx, bookId, extracted);
+      if (prev && prev.removed_at === null && prev.book_id === bookId) result.unchanged++;
+      else result.added++;
     } catch (err) {
       ctx.log.warn(`Scan failed for ${path}: ${(err as Error).message}`);
       result.failed++;

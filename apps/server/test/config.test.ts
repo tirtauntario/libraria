@@ -1,13 +1,50 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createServer } from '../src/app';
 import { CONFIG_FILENAME, loadConfig } from '../src/config';
 import { createLogger } from '../src/log';
-import { newCreds, p } from './helpers';
-import request from 'supertest';
+import { newCreds, p, startServer } from './helpers';
+
+describe('web client', () => {
+  it('serves the PWA with long-lived hashed assets and no-cache entry points', async () => {
+    const web = join(dir, 'web');
+    await mkdir(join(web, 'assets'), { recursive: true });
+    writeFileSync(join(web, 'index.html'), '<!doctype html><title>Libraria</title>');
+    writeFileSync(join(web, 'sw.js'), 'self.addEventListener("fetch", () => {});');
+    writeFileSync(join(web, 'manifest.webmanifest'), '{}');
+    writeFileSync(join(web, 'assets', 'index-B4x9kQ2a.js'), 'console.log(1)');
+    const t = await startServer({ webDir: web });
+    try {
+      const index = await t.api.get('/');
+      expect(index.status).toBe(200);
+      expect(index.text).toContain('Libraria');
+      expect(index.headers['cache-control']).toBe('no-cache');
+      expect((await t.api.get('/sw.js')).headers['cache-control']).toBe('no-cache');
+      expect((await t.api.get('/manifest.webmanifest')).headers['cache-control']).toBe('no-cache');
+      const asset = await t.api.get('/assets/index-B4x9kQ2a.js');
+      expect(asset.headers['cache-control']).toBe('public, max-age=31536000, immutable');
+      expect(asset.headers['x-content-type-options']).toBe('nosniff');
+      expect((await t.api.get(p('/info'))).status).toBe(200);
+    } finally {
+      await t.destroy();
+    }
+  });
+
+  it('answers / with a short note when no web client is installed', async () => {
+    const t = await startServer();
+    try {
+      const res = await t.api.get('/');
+      expect(res.status).toBe(200);
+      expect(res.text).toMatch(/\/api\/v1/);
+    } finally {
+      await t.destroy();
+    }
+  });
+});
 
 let dir: string;
 beforeEach(async () => {
