@@ -1,6 +1,21 @@
 # Libraria server
 
-A self-hosted community library and sync home for the Libraria reader. One Node process, one SQLite file (built-in `node:sqlite`), no native dependencies. Runs on a Raspberry Pi, a NAS or a VPS.
+This is the **Libraria server**: the optional part of Libraria that hosts a shared library for a group, and can act as a sync home for its members' progress and bookmarks. The **Libraria app** (the reader, in `apps/web`) works without it. If you only want to read, or to join someone else's library, you do not need to run this. See [the two parts of Libraria](../../README.md#libraria-has-two-parts).
+
+One server is one library, run by one **owner** who can appoint **curators**. **Members** connect from their Libraria app, read and download books, and can submit books for review. Servers are independent: they do not talk to each other, and no one else operates or controls yours.
+
+One Node process, one SQLite file (built-in `node:sqlite`), no native dependencies. Runs on a Raspberry Pi, a NAS or a VPS.
+
+## Your responsibilities as an operator
+
+Running a server means you publish content to your members. As owner (and as curators):
+
+- Publish only books you have the right to share: your own work, public-domain works, works under a licence that allows it, or works you have permission for.
+- Review member submissions with that in mind before approving them, and keep the library private when the content is meant for a closed group.
+- Handle copyright notices and takedown requests for your server yourself. The Libraria project does not run your server and cannot act on it.
+- Follow the privacy laws that apply to your members' data (for example, student papers submitted for grading).
+
+The software comes without warranty, and its authors are not liable for content stored or shared on your server. Read the full [disclaimer](../../DISCLAIMER.md).
 
 ## Run
 

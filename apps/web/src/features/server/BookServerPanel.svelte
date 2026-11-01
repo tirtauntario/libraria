@@ -176,6 +176,7 @@
       {/each}
     </fieldset>
     <p class="muted small">Libraria checks first whether the server already has this exact file; then nothing is uploaded.</p>
+    <p class="muted small">Only send books you have the right to share: your own work, public-domain works, or works whose licence allows it. <a href="#/about">Your content, your responsibility</a></p>
   </form>
   {#snippet actions()}
     <button class="btn" type="button" onclick={() => (pickOpen = false)}>Cancel</button>

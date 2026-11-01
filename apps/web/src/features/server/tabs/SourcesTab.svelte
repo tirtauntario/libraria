@@ -96,7 +96,8 @@
     <h2>Folders on the server</h2>
     <p class="muted small">
       The server can publish books that already sit on its disk. For safety, only folders inside the roots set in the server’s
-      config file (<code>sourceRoots</code>) can be added.
+      config file (<code>sourceRoots</code>) can be added. As the owner you are responsible for what the server publishes: add
+      only books you have the right to share. <a href="#/about">Your content, your responsibility</a>
     </p>
     {#if roots.length === 0}
       <div class="card note">

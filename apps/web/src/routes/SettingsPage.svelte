@@ -4,7 +4,7 @@
   import { href } from '../lib/router.svelte';
   import { services } from '../lib/services';
   import { catalog } from '../lib/stores/catalog.svelte';
-  import { pwa } from '../lib/stores/pwa.svelte';
+  import { INSTALL_HELP, pwa } from '../lib/stores/pwa.svelte';
   import { settings } from '../lib/stores/settings.svelte';
   import { toasts } from '../lib/stores/toasts.svelte';
   import { isPersisted, requestPersistence, storageEstimate, type StorageEstimate } from '../lib/storage/opfs';
@@ -75,14 +75,6 @@
     location.reload();
   }
 
-  const installHelp: Record<string, string> = {
-    ios: 'In Safari, tap Share, then “Add to Home Screen”. On iPhone and iPad, offline storage is only dependable for the installed app.',
-    android: 'Open the browser menu and choose “Install app” or “Add to Home screen”.',
-    'mac-safari': 'In Safari, choose File › Add to Dock.',
-    chromium: 'Use the install icon in the address bar, or the browser menu › “Install Libraria”.',
-    firefox: 'Firefox on desktop cannot install web apps. Libraria still works in the browser tab.',
-    other: 'Look for “Install” or “Add to Home Screen” in your browser menu.',
-  };
 </script>
 
 <div class="page narrow">
@@ -234,7 +226,7 @@
       {#if updateState === 'failed'}<p class="subtle">Could not check for updates.</p>{/if}
     {:else}
       <div class="row">
-        <div class="row-text"><p>Install Libraria</p><p class="subtle">{installHelp[pwa.platform]}</p></div>
+        <div class="row-text"><p>Install Libraria</p><p class="subtle">{INSTALL_HELP[pwa.platform]}</p></div>
         {#if pwa.canPrompt}<button class="btn small primary" type="button" onclick={() => pwa.promptInstall()}>Install</button>{/if}
       </div>
     {/if}
@@ -262,7 +254,7 @@
   </section>
 
   <section class="about">
-    <p><strong>Libraria</strong> {__APP_VERSION__}</p>
+    <p><strong>Libraria</strong> {__APP_VERSION__} · <a href="#/about">About Libraria</a></p>
     <p class="subtle">
       Free software under the <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer">GNU AGPL-3.0</a>.
       <a href={__SOURCE_URL__} target="_blank" rel="noopener noreferrer">Source code</a>.

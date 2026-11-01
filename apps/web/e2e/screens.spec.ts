@@ -17,6 +17,11 @@ async function shot(page: Page, name: string) {
 test('pages and panels', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 820 });
   await page.goto('./');
+  // A first-time visitor finds the explanation from the empty library.
+  await page.getByRole('link', { name: /What Libraria is/ }).click();
+  await expect(page.getByRole('heading', { name: 'What is a PWA?' })).toBeVisible();
+  await shot(page, 'about-desktop');
+  await page.goto('./');
   const chooser = page.waitForEvent('filechooser');
   await page.getByRole('button', { name: 'Add books' }).first().click();
   await (await chooser).setFiles([
