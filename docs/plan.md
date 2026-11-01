@@ -206,7 +206,7 @@ Settings page, stored in IndexedDB. Two groups:
 - Synced records (bookmarks, notes) keep their own UUIDv7, which is globally unique, so they merge without collisions.
 - Progress: one record per (user, sha512), last-write-wins on `updated_at`.
 - Bookmarks/notes: add-only with soft delete (`deleted_at`), merged by UUID.
-- Positions: page number for comics and PDF; EPUB CFI for EPUB (chapter index + scroll offset does not survive font or layout changes).
+- Positions: page number for comics and PDF. EPUB uses spine index plus progression (0..1) within the chapter, which survives font and layout changes. CFI was the original plan; spine + progression is what shipped.
 
 ### End-to-end encrypted sync
 
@@ -266,3 +266,27 @@ Client (IndexedDB stores) and server (SQLite tables) share these shapes in `pack
 5. Server: first-run setup, accounts, roles, signups, sources, uploads, scanning, book API.
 6. Client: connect to multiple servers, download for offline, submit books; server review queue.
 7. End-to-end encrypted sync home.
+
+## Implementation notes
+
+Decisions made while building, beyond the sections above.
+
+- **Sync home is per device.** It is stored with the local data key, not in synced settings, since a new device must sign in to unlock the key anyway.
+- **The raw data key stays on the device** (IndexedDB) so sync runs without re-entering the password. Anyone with access to the browser profile can read it. "Forget sync key" removes it.
+- **Server session tokens sync** inside the encrypted libraria source record. Signing out of a server clears it on every synced device.
+- **A joined server's source and library use the server's own id**, so two devices joining the same server merge instead of duplicating it.
+- **New sources get a library of the same name** automatically.
+- **Removed remote files** keep the book (marked unavailable) unless it exists elsewhere. Progress and bookmarks are never deleted.
+- **Deleting a server book that also lives on a disk source** leaves a hidden tombstone so the next scan does not re-add it.
+- **`PUT /sync/keys`** creates keys once; replacing them needs the header `X-Libraria-Replace-Keys: 1`.
+
+## Known gaps
+
+- Google Drive and Dropbox are covered by mocked tests only; not yet run against the real services.
+- Google's implicit flow has no refresh token: Drive asks to sign in again about every hour.
+- Server catalog refresh downloads the full book list (no "changed since" query).
+- Download resume works within a session, not across reloads.
+- Fixed-layout EPUBs render as reflowable text; no bundled dyslexia-friendly font.
+- CBR and Safari/WebKit are not covered by the end-to-end tests.
+- On MySQL/Postgres the sync rev counter would need a row lock; only SQLite is implemented.
+
