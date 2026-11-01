@@ -91,7 +91,8 @@ export interface LibrariaConfig {
 
 export type SourceConfig =
   | { kind: 'local' }
-  | { kind: 'folder'; name: string }
+  /** `handleId` keys the FileSystemDirectoryHandle stored on this device only. */
+  | { kind: 'folder'; name: string; handleId?: string }
   | ({ kind: 'webdav' } & WebdavConfig)
   | ({ kind: 'gdrive' } & GdriveConfig)
   | ({ kind: 'dropbox' } & DropboxConfig)
@@ -110,6 +111,8 @@ export interface LibrarySourceRef {
   sourceId: string;
   /** Folder inside the source, '' for the root. */
   path: string;
+  /** Display name of `path` when the path is made of ids (Google Drive). */
+  label?: string;
 }
 
 export interface Library {
