@@ -5,6 +5,7 @@
   import { services } from '../lib/services';
   import { catalog } from '../lib/stores/catalog.svelte';
   import { INSTALL_HELP, pwa } from '../lib/stores/pwa.svelte';
+  import { APP_BUILD, APP_VERSION, buildLabel } from '../lib/version';
   import { settings } from '../lib/stores/settings.svelte';
   import { toasts } from '../lib/stores/toasts.svelte';
   import { isPersisted, requestPersistence, storageEstimate, type StorageEstimate } from '../lib/storage/opfs';
@@ -214,6 +215,10 @@
 
   <section class="card group">
     <h2>App</h2>
+    <div class="row">
+      <div class="row-text"><p>Version {APP_VERSION}</p><p class="subtle">{buildLabel()}</p></div>
+      <a class="btn small" href="#/changelog">What's new</a>
+    </div>
     {#if pwa.installed}
       <div class="row">
         <div class="row-text"><p>Installed</p><p class="subtle">Libraria runs as an app on this device.</p></div>
@@ -254,7 +259,7 @@
   </section>
 
   <section class="about">
-    <p><strong>Libraria</strong> {__APP_VERSION__} · <a href="#/about">About Libraria</a></p>
+    <p><strong>Libraria</strong> {APP_BUILD.full} · <a href="#/about">About Libraria</a> · <a href="#/changelog">What's new</a></p>
     <p class="subtle">
       Free software under the <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer">GNU AGPL-3.0</a>.
       <a href={__SOURCE_URL__} target="_blank" rel="noopener noreferrer">Source code</a>.

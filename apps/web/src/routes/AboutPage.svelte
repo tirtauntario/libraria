@@ -2,6 +2,7 @@
   import { INSTALL_HELP, pwa } from '../lib/stores/pwa.svelte';
   import Icon from '../lib/ui/Icon.svelte';
   import Logo from '../lib/ui/Logo.svelte';
+  import { APP_BUILD } from '../lib/version';
 
   let { params: _params }: { params: Record<string, string> } = $props();
 </script>
@@ -137,7 +138,7 @@
   </section>
 
   <p class="footer subtle">
-    Libraria {__APP_VERSION__} · Free software under the
+    Libraria {APP_BUILD.full} · <a href="#/changelog">What's new</a> · Free software under the
     <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer">GNU AGPL-3.0</a> ·
     <a href={__SOURCE_URL__} target="_blank" rel="noopener noreferrer">Source code</a>
   </p>

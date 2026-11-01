@@ -137,6 +137,8 @@ All three share `ReaderChrome.svelte` (top bar with back, bookmark toggle, conte
 
 `vite-plugin-pwa` (generateSW): the app shell, workers and pdf.js are precached, so the app loads offline after the first visit. Update prompt via a toast; install prompt on Home (Chromium) and instructions in Settings. The manifest declares `file_handlers` for .epub/.pdf/.cbz/.cbr (desktop Chromium; files arrive through `launchQueue`) and a `share_target` (Android): `public/share-target.js`, loaded into the generated worker with `importScripts`, receives the multipart POST, parks the files in the `libraria-share` cache and redirects to the app, which imports them on start (`takeSharedFiles`). iOS supports neither, so there the file picker is the way in. The build uses a relative base, so it works at a domain root, a sub-path, or served by a Libraria server.
 
+Version: `__APP_VERSION__` (package.json) and `__APP_BUILD__` (`BuildInfo` from `scripts/build-info.mjs`: commit, release or not) are defined at build time. `src/lib/version.ts` labels the build, bundles `CHANGELOG.md` (`?raw`) for the What's new page (`#/changelog`, Unreleased notes only in non-release builds), and toasts once after an update to a newer version (`libraria:version-seen` in localStorage). See "Versions and releases" in the root README.
+
 ## Not done yet
 
 - Google Drive and Dropbox are covered by mocked unit tests and a mocked sign-in e2e only; they have not been run against the real services.

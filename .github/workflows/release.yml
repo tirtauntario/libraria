@@ -1,0 +1,38 @@
+# Publishes a GitHub Release when a version tag (made by `pnpm release`) is pushed.
+# The notes come from that version's section of CHANGELOG.md.
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Check the tag matches package.json and write the notes
+        run: |
+          node --input-type=module -e '
+            import { readFileSync, writeFileSync } from "node:fs";
+            import { changelogNotes, parseVersion } from "./packages/core/src/version.ts";
+            const version = JSON.parse(readFileSync("package.json", "utf8")).version;
+            const tag = process.env.GITHUB_REF_NAME;
+            if (tag !== `v${version}`) { console.error(`Tag ${tag} does not match package.json ${version}`); process.exit(1); }
+            const notes = changelogNotes(readFileSync("CHANGELOG.md", "utf8"), version);
+            if (!notes) { console.error(`CHANGELOG.md has no notes for ${version}`); process.exit(1); }
+            writeFileSync("release-notes.md", notes + "\n");
+            writeFileSync(process.env.GITHUB_ENV, `PRERELEASE=${parseVersion(version).prerelease.length > 0}\n`, { flag: "a" });
+          '
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --title "Libraria ${GITHUB_REF_NAME#v}" --notes-file release-notes.md \
+            $([ "$PRERELEASE" = "true" ] && echo --prerelease)

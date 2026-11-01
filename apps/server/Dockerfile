@@ -7,6 +7,10 @@ FROM node:${NODE_VERSION}-slim AS build
 WORKDIR /src
 RUN npm install -g pnpm@10.33.2
 COPY . .
+# .git is not copied: pass the commit for version build metadata, and LIBRARIA_RELEASE=1 for a release.
+#   --build-arg LIBRARIA_BUILD_COMMIT=$(git rev-parse HEAD)
+ARG LIBRARIA_BUILD_COMMIT=""
+ARG LIBRARIA_RELEASE=""
 RUN pnpm install --frozen-lockfile
 # The web client is optional: build it when the workspace has one.
 RUN if [ -d apps/web ]; then pnpm --filter @libraria/web build; fi

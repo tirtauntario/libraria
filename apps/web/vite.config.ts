@@ -4,8 +4,10 @@ import { dirname } from 'node:path';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { buildInfo } from '../../scripts/build-info.mjs';
 
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string };
+const build = buildInfo(pkg.version);
 
 // @codedread/bitjs only exports its index, but the CBR worker in core imports
 // `@codedread/bitjs/archive/unrar.js` directly. Point that at the real file.
@@ -20,6 +22,7 @@ export default defineConfig({
   base: './',
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
+    __APP_BUILD__: JSON.stringify(build),
     __SOURCE_URL__: JSON.stringify('https://github.com/tirtauntario/libraria'),
   },
   resolve: {

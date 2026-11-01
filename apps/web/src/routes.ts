@@ -2,6 +2,7 @@ import { navItems } from './lib/extensions';
 import { registerRoute } from './lib/router.svelte';
 import AboutPage from './routes/AboutPage.svelte';
 import BookPage from './routes/BookPage.svelte';
+import ChangelogPage from './routes/ChangelogPage.svelte';
 import Home from './routes/Home.svelte';
 import Libraries from './routes/Libraries.svelte';
 import LibraryPage from './routes/LibraryPage.svelte';
@@ -15,6 +16,7 @@ registerRoute({ pattern: '/libraries', component: Libraries, section: 'libraries
 registerRoute({ pattern: '/book/:id', component: BookPage, section: 'libraries' });
 registerRoute({ pattern: '/settings', component: SettingsPage, section: 'settings' });
 registerRoute({ pattern: '/about', component: AboutPage, section: 'settings' });
+registerRoute({ pattern: '/changelog', component: ChangelogPage, section: 'settings' });
 registerRoute({ pattern: '/read/:id', component: ReaderPage, layout: 'bare' });
 registerRoute({ pattern: '/*', component: NotFound });
 

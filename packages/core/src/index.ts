@@ -10,3 +10,4 @@ export * from './models';
 export * from './settings';
 export * from './sort';
 export * from './sync';
+export * from './version';

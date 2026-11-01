@@ -183,6 +183,26 @@ pnpm dev:web
 
 Design and decisions are in [docs/plan.md](docs/plan.md).
 
+### Versions and releases
+
+Libraria uses [Semantic Versioning](https://semver.org/). The app and the server share **one version number**, kept in the root `package.json` and copied to every package (a test fails if they drift apart). For this project:
+
+- **Major** (`1.0.0` → `2.0.0`): something people must act on, such as a new server API version, data that needs migrating, or a removed feature.
+- **Minor** (`1.1.0` → `1.2.0`): new features that keep working with existing servers and data.
+- **Patch** (`1.2.0` → `1.2.1`): fixes only.
+
+The server API has its own number (`/api/v1`) that changes only when the API breaks, so apps and servers of different versions keep working together.
+
+To release:
+
+1. While working, add notes under **Unreleased** in [CHANGELOG.md](CHANGELOG.md).
+2. On a clean `main`, run `pnpm release patch` (or `minor`, `major`, or an exact version such as `1.0.0-rc.1`). Add `--dry-run` to preview. It sets the version everywhere, moves the notes under the new version and date, commits `Release vX.Y.Z` and tags `vX.Y.Z`.
+3. Push the commit and the tag: `git push origin main vX.Y.Z`. The [Release workflow](.github/workflows/release.yml) publishes a GitHub Release with those notes.
+
+**In the app**, **Settings → App** shows the version and build, and **What's new** lists the changes. After an update the app says which version it was updated to. A server's version is shown on its **Account** tab and returned by `GET /api/v1/info`.
+
+**Build metadata.** A build made exactly from a release tag reports the plain version. Any other build adds its commit, such as `0.2.0+9d74586`, and `.dirty` if it had uncommitted changes, so a build from `main` can be told apart from the release. Docker builds have no `.git`: pass `--build-arg LIBRARIA_BUILD_COMMIT=$(git rev-parse HEAD)`, and `--build-arg LIBRARIA_RELEASE=1` when building a release.
+
 ## License
 
 Libraria is free software under the [GNU AGPL-3.0-or-later](LICENSE). See also the [disclaimer](DISCLAIMER.md).
