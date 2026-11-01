@@ -32,6 +32,7 @@ pnpm check                         # type-check all packages
 pnpm --filter @libraria/web e2e    # Playwright against vite preview
 pnpm dev:web                       # client dev server
 pnpm dev:server                    # server dev (tsx watch)
+pnpm device                        # "Libraria - Dev" build on :4173 for phone testing over USB
 pnpm build                         # build all
 ```
 

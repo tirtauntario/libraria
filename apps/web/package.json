@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "device": "vite build --mode device --outDir dist-device && vite preview --outDir dist-device --port 4173 --strictPort",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
     "e2e": "playwright test",
