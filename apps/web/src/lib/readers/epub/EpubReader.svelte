@@ -1,15 +1,17 @@
 <script lang="ts">
-  import type { BookFont, Locator } from '@libraria/core';
+  import type { BookFont, Locator, PageTurn } from '@libraria/core';
   import { EpubBook, type EpubTocEntry } from '@libraria/core/browser';
   import { onDestroy, onMount } from 'svelte';
+  import { MediaQuery } from 'svelte/reactivity';
   import { settings } from '../../stores/settings.svelte';
   import Icon from '../../ui/Icon.svelte';
   import Segmented from '../../ui/Segmented.svelte';
-  import { isTypingTarget, SWIPE_THRESHOLD, toggleFullscreen } from '../gestures';
+  import { clickZone, isTypingTarget, swipe, SWIPE_THRESHOLD, toggleFullscreen } from '../gestures';
   import { pageFromProgression, samePosition } from '../locator';
   import ReaderChrome from '../ReaderChrome.svelte';
   import type { Panel, ReaderProps } from '../types';
   import { BOOK_FONTS, BOOK_THEMES, countPages, FONT_SIZE, LINE_HEIGHT, MARGIN, readerCss, WORD_SPACING } from './style';
+  import { commitDrag, type Corner, curlGeometry, dragShare, easeOutCubic, polygonCss, TURN_MS } from './turn';
 
   /**
    * EPUB reader. Each chapter is a sanitized document from core's EpubBook,
@@ -17,6 +19,10 @@
    * book code never runs, and book HTML never enters the app's DOM. The
    * parent drives everything (page turns, links, keys, swipes) by listening
    * on the iframe's document.
+   *
+   * Animated page turns need the old and the new page on screen together, so
+   * a second, inert frame (the "peel") holds the same chapter and shows the
+   * page being left while the main frame already shows the next one.
    */
   let { book, blob, initial, edge, bookmarks, onlocation, onback }: ReaderProps = $props();
 
@@ -32,6 +38,7 @@
   let visible = $state(true);
   let panel = $state<Panel>(null);
   let frame = $state<HTMLIFrameElement>();
+  let peel = $state<HTMLIFrameElement>();
 
   let W = $state(0);
   let H = $state(0);
@@ -42,6 +49,8 @@
   const total = $derived(epub?.spineLength ?? 0);
   const theme = $derived(BOOK_THEMES[bs.theme] ?? BOOK_THEMES.light);
   const progression = $derived(paginated ? (pages > 1 ? page / pages : 0) : scrollProgress);
+  const reduceMotion = new MediaQuery('(prefers-reduced-motion: reduce)');
+  const turnStyle = $derived<PageTurn>(paginated && !reduceMotion.current ? bs.pageTurn : 'none');
 
   let detach: (() => void) | null = null;
   let loadToken = 0;
@@ -108,6 +117,7 @@
     });
     if (token !== loadToken) return;
     spine = index;
+    chapterHtml = html;
     const doc = f.contentDocument;
     if (!doc) return;
     detach = attach(doc);
@@ -204,6 +214,7 @@
   async function relayout() {
     const doc = frame?.contentDocument;
     if (!doc || loading) return;
+    stopTurn();
     // Not `progression`: after a flow switch it would read the other mode's state.
     const keep = lastProgression;
     if (!paginated) doc.body.style.transform = '';
@@ -228,32 +239,225 @@
 
   function next() {
     if (loading || !epub) return;
+    finishTurn();
     if (paginated && page < pages - 1) {
-      showPage(page + 1);
-      report();
+      turnWithin(page + 1, 1);
     } else if (!paginated && scrollProgress < 0.999) {
       const el = scroller();
       el?.scrollBy({ top: (el.clientHeight || H) * 0.9 });
     } else if (spine < total - 1) {
-      void loadChapter(spine + 1, { kind: 'start' });
+      void turnChapter(spine + 1, { kind: 'start' }, 1);
     }
   }
 
   function prev() {
     if (loading || !epub) return;
+    finishTurn();
     if (paginated && page > 0) {
-      showPage(page - 1);
-      report();
+      turnWithin(page - 1, -1);
     } else if (!paginated && scrollProgress > 0.001) {
       const el = scroller();
       el?.scrollBy({ top: -(el.clientHeight || H) * 0.9 });
     } else if (spine > 0) {
-      void loadChapter(spine - 1, { kind: 'end' });
+      void turnChapter(spine - 1, { kind: 'end' }, -1);
     }
   }
 
+  // --- animated page turns ---------------------------------------------------------
+
+  /**
+   * A page turn in progress. `p` goes from 0 (the earlier page lies on top)
+   * to 1 (it has turned away): forward turns run 0 → 1, backward 1 → 0. The
+   * earlier page is the peel going forward and the main frame going back.
+   */
+  type Turn = { id: number; dir: 1 | -1; p: number; corner: Corner };
+  let turn = $state<Turn | null>(null);
+  let turnIds = 0;
+  let anim: { raf: number; end: () => void } | null = null;
+
+  /** HTML of the chapter in the main frame, so the peel can load the same. */
+  let chapterHtml = '';
+  /** Chapter loaded in the peel, or -1. */
+  let peelSpine = $state(-1);
+  let peelPending = -1;
+  let peelToken = 0;
+
+  async function loadPeel(): Promise<void> {
+    const f = peel;
+    if (!f || !chapterHtml) return;
+    const token = ++peelToken;
+    const index = spine;
+    peelPending = index;
+    peelSpine = -1;
+    await new Promise<void>((resolve) => {
+      f.onload = () => resolve();
+      f.srcdoc = chapterHtml;
+    });
+    // No need to wait for fonts and images: the peel only shows during a turn, by then they have loaded.
+    if (token !== peelToken) return;
+    peelPending = -1;
+    peelSpine = index;
+  }
+
+  // Keep the peel on the current chapter, between turns.
+  $effect(() => {
+    if (turnStyle === 'none' || loading || turn || !peel) return;
+    if (peelSpine !== spine && peelPending !== spine) void loadPeel();
+  });
+
+  $effect(() => {
+    if (turnStyle === 'none') stopTurn();
+  });
+
+  function peelReady(): boolean {
+    return turnStyle !== 'none' && peelSpine === spine && !!peel?.contentDocument?.body;
+  }
+
+  /** Show page `p` of the current chapter in the peel, with the main frame's current CSS. */
+  function setPeelPage(p: number) {
+    const doc = peel?.contentDocument;
+    if (!doc?.body) return;
+    const style = doc.getElementById('libraria-reader');
+    if (style && style.textContent !== lastCss) style.textContent = lastCss;
+    doc.body.style.transform = p ? `translateX(${(rtl ? 1 : -1) * p * pageWidth()}px)` : '';
+  }
+
+  function startTurn(dir: 1 | -1, corner: Corner = 'bottom'): number {
+    setPeelPage(page);
+    turn = { id: ++turnIds, dir, p: dir > 0 ? 0 : 1, corner };
+    return turn.id;
+  }
+
+  /** Animate the turn to `to`, then run `end` (also run at once by finishTurn). */
+  function animateTo(to: number, end: () => void) {
+    const t = turn;
+    if (!t) return end();
+    cancelAnimationFrame(anim?.raf ?? 0);
+    const from = t.p;
+    const ms = (turnStyle === 'curl' ? TURN_MS.curl : TURN_MS.slide) * Math.abs(to - from);
+    const start = performance.now();
+    const done = () => {
+      anim = null;
+      if (turn?.id === t.id) turn.p = to;
+      end();
+    };
+    const step = (now: number) => {
+      const k = ms > 0 ? Math.min(1, (now - start) / ms) : 1;
+      if (k >= 1) return done();
+      if (turn?.id === t.id) turn.p = from + (to - from) * easeOutCubic(k);
+      anim = { raf: requestAnimationFrame(step), end: done };
+    };
+    anim = { raf: requestAnimationFrame(step), end: done };
+  }
+
+  function playTurn(id: number) {
+    if (turn?.id !== id) return;
+    animateTo(turn.dir > 0 ? 1 : 0, () => {
+      if (turn?.id === id) turn = null;
+    });
+  }
+
+  /** Jump a running animation to its end. */
+  function finishTurn() {
+    if (anim) {
+      cancelAnimationFrame(anim.raf);
+      anim.end();
+    }
+  }
+
+  function stopTurn() {
+    finishTurn();
+    drag = null;
+    turn = null;
+  }
+
+  function turnWithin(target: number, dir: 1 | -1) {
+    const id = peelReady() ? startTurn(dir) : 0;
+    showPage(target);
+    report();
+    if (id) playTurn(id);
+  }
+
+  async function turnChapter(index: number, target: Target, dir: 1 | -1) {
+    // The peel keeps showing the page being left while the next chapter loads.
+    const id = paginated && peelReady() ? startTurn(dir) : 0;
+    await loadChapter(index, target);
+    if (!id || turn?.id !== id) return;
+    if (chapterError || spine !== index) turn = null;
+    else playTurn(id);
+  }
+
+  /** A swipe that drags the page along with the finger (paginated, within a chapter). */
+  let drag: { id: number; base: number; dir: 1 | -1 } | null = null;
+
+  function beginDrag(dir: 1 | -1, y: number): boolean {
+    const target = page + dir;
+    finishTurn();
+    if (loading || target < 0 || target >= pages || !peelReady()) return false;
+    const base = page;
+    const id = startTurn(dir, y < H / 2 ? 'top' : 'bottom');
+    showPage(target);
+    drag = { id, base, dir };
+    return true;
+  }
+
+  function moveDrag(dx: number) {
+    if (!drag || turn?.id !== drag.id) return;
+    const share = dragShare(dx, pageWidth(), drag.dir > 0, rtl);
+    turn.p = drag.dir > 0 ? share : 1 - share;
+  }
+
+  function endDrag(dx: number, speed: number) {
+    const d = drag;
+    drag = null;
+    if (!d || turn?.id !== d.id) return;
+    const share = dragShare(dx, pageWidth(), d.dir > 0, rtl);
+    if (commitDrag(share, speed)) {
+      report();
+      playTurn(d.id);
+    } else {
+      // Fall back to the page the drag started on.
+      animateTo(d.dir > 0 ? 0 : 1, () => {
+        if (turn?.id !== d.id) return;
+        showPage(d.base);
+        turn = null;
+      });
+    }
+  }
+
+  const iw = $derived(Math.floor(W));
+  const ih = $derived(Math.floor(H));
+  /** Inline styles for the frames and the overlays while a page turns. */
+  const layers = $derived.by(() => {
+    const idle = { main: '', peel: 'visibility: hidden;', shadow: '', flap: '' };
+    if (!turn || turnStyle === 'none') return idle;
+    const { p, dir } = turn;
+    const peelIsEarlier = dir > 0;
+    if (turnStyle === 'slide') {
+      const s = rtl ? -1 : 1;
+      const earlier = `z-index: 2; transform: translateX(${-s * p * iw}px); box-shadow: 0 0 24px rgb(0 0 0 / 0.18);`;
+      const later = `z-index: 1; transform: translateX(${s * (1 - p) * iw}px);`;
+      return { main: peelIsEarlier ? later : earlier, peel: peelIsEarlier ? earlier : later, shadow: '', flap: '' };
+    }
+    const g = curlGeometry(p, iw, ih, { rtl, corner: turn.corner });
+    const earlier = `z-index: 3; clip-path: ${polygonCss(g.front)};`;
+    const later = 'z-index: 1;';
+    const width = Math.min(48, 10 + (g.edge - g.fold) * 0.25);
+    const shade = (0.3 * Math.sin(Math.PI * p)).toFixed(3);
+    const shadow = g.flap.length
+      ? `background: linear-gradient(${g.angle}deg, transparent ${g.fold - width}px, rgb(0 0 0 / ${shade}) ${g.fold}px, transparent ${g.fold}px);`
+      : '';
+    const span = g.edge - g.fold;
+    const flap = g.flap.length
+      ? `clip-path: ${polygonCss(g.flap)}; background-color: ${theme.bg}; background-image: linear-gradient(${g.angle}deg,` +
+        ` rgb(0 0 0 / 0.16) ${g.fold}px, rgb(255 255 255 / 0.14) ${g.fold + span * 0.35}px, rgb(0 0 0 / 0.07) ${g.edge}px);`
+      : '';
+    return { main: peelIsEarlier ? later : earlier, peel: peelIsEarlier ? earlier : later, shadow, flap };
+  });
+
   function goTo(target: { spine: number; fragment: string | null }) {
     panel = null;
+    stopTurn();
     if (target.spine === spine && !loading && target.fragment) {
       position({ kind: 'fragment', id: target.fragment });
       report();
@@ -264,6 +468,7 @@
 
   function jump(loc: Locator) {
     if (loc.type !== 'epub') return;
+    stopTurn();
     if (loc.spine === spine && !loading) {
       position({ kind: 'progression', value: loc.progression });
       report();
@@ -306,19 +511,59 @@
       else visible = !visible;
     };
     const onKey = (e: KeyboardEvent) => handleKey(e);
+    // Swipes: within a chapter the page follows the finger (when pages animate);
+    // otherwise, and across chapters, a finished swipe turns the page.
+    let dragging = false;
+    let plain = false;
+    let last = { x: 0, t: 0, v: 0 };
     const onTouchStart = (e: TouchEvent) => {
-      touch = e.touches.length === 1 ? { x: e.touches[0]!.clientX, y: e.touches[0]!.clientY, t: Date.now() } : null;
+      if (dragging) endDrag(0, 0);
+      dragging = plain = false;
+      const t = e.touches[0];
+      touch = e.touches.length === 1 && t ? { x: t.clientX, y: t.clientY, t: Date.now() } : null;
+      if (touch) last = { x: touch.x, t: touch.t, v: 0 };
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (!touch || !t || e.touches.length !== 1 || !paginated || !bs.swipe) return;
+      const dx = t.clientX - touch.x;
+      const dy = t.clientY - touch.y;
+      const now = Date.now();
+      if (now > last.t) last = { x: t.clientX, t: now, v: (t.clientX - last.x) / (now - last.t) };
+      if (!dragging && !plain) {
+        if (Math.abs(dx) < 10 || Math.abs(dx) <= Math.abs(dy)) return;
+        const forward = (dx < 0) !== rtl;
+        if (turnStyle !== 'none' && beginDrag(forward ? 1 : -1, touch.y)) dragging = true;
+        else plain = true;
+      }
+      if (!dragging) return;
+      if (e.cancelable) e.preventDefault();
+      moveDrag(dx);
     };
     const onTouchEnd = (e: TouchEvent) => {
       const t = e.changedTouches[0];
-      if (!touch || !t || !paginated) return;
+      if (!touch || !t) return;
       const dx = t.clientX - touch.x;
       const dy = t.clientY - touch.y;
       touch = null;
+      if (dragging) {
+        dragging = false;
+        const forward = drag?.dir === 1;
+        // Recent finger speed, signed towards the turn.
+        const speed = (forward !== rtl ? -1 : 1) * last.v;
+        endDrag(dx, speed);
+        return;
+      }
+      if (!paginated || !bs.swipe) return;
       if (Math.abs(dx) >= SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy) * 1.2) {
         const forward = (dx < 0) !== rtl;
         (forward ? next : prev)();
       }
+    };
+    const onTouchCancel = () => {
+      touch = null;
+      if (dragging) endDrag(0, 0);
+      dragging = false;
     };
     // Paginated: block native horizontal scrolling (trackpads, touch) so pages stay aligned.
     const onWheel = (e: WheelEvent) => {
@@ -353,7 +598,9 @@
     doc.addEventListener('click', onClick);
     doc.addEventListener('keydown', onKey);
     doc.addEventListener('touchstart', onTouchStart, { passive: true });
+    doc.addEventListener('touchmove', onTouchMove, { passive: false });
     doc.addEventListener('touchend', onTouchEnd, { passive: true });
+    doc.addEventListener('touchcancel', onTouchCancel, { passive: true });
     doc.addEventListener('wheel', onWheel, { passive: false });
     win?.addEventListener('scroll', onScroll, { passive: true });
     win?.addEventListener('scroll', onPaginatedScroll, { passive: true });
@@ -361,7 +608,9 @@
       doc.removeEventListener('click', onClick);
       doc.removeEventListener('keydown', onKey);
       doc.removeEventListener('touchstart', onTouchStart);
+      doc.removeEventListener('touchmove', onTouchMove);
       doc.removeEventListener('touchend', onTouchEnd);
+      doc.removeEventListener('touchcancel', onTouchCancel);
       doc.removeEventListener('wheel', onWheel);
       win?.removeEventListener('scroll', onScroll);
       win?.removeEventListener('scroll', onPaginatedScroll);
@@ -410,9 +659,11 @@
         else handled = false;
         break;
       case 'Home':
+        stopTurn();
         void loadChapter(0, { kind: 'start' });
         break;
       case 'End':
+        stopTurn();
         void loadChapter(total - 1, { kind: 'end' });
         break;
       case 'f':
@@ -482,6 +733,20 @@
     <Segmented label="Layout" value={bs.flow} onchange={(v) => settings.updateSynced((s) => (s.book.flow = v))}
       options={[{ value: 'paginated', label: 'Pages', icon: 'page-single' }, { value: 'scrolled', label: 'Scroll', icon: 'scroll' }]} />
   </div>
+  {#if paginated}
+    <div class="opt">
+      <span class="label">Page turn</span>
+      <Segmented label="Page turn" value={bs.pageTurn} onchange={(v) => settings.updateSynced((s) => (s.book.pageTurn = v))}
+        options={[{ value: 'none', label: 'None' }, { value: 'slide', label: 'Slide' }, { value: 'curl', label: 'Curl' }]} />
+      {#if reduceMotion.current && bs.pageTurn !== 'none'}
+        <p class="hint">This device asks for reduced motion, so pages turn without animation.</p>
+      {/if}
+    </div>
+    <label class="opt row">
+      <span class="label">Swipe to turn pages</span>
+      <input type="checkbox" checked={bs.swipe} onchange={(e) => settings.updateSynced((s) => (s.book.swipe = e.currentTarget.checked))} />
+    </label>
+  {/if}
   <div class="opt">
     <span class="label">Page colour</span>
     <div class="swatches" role="radiogroup" aria-label="Page colour">
@@ -581,16 +846,47 @@
   tone={bs.theme}
 >
   <div class="paper" style:background={theme.bg} style:color={theme.fg}>
-    <div class="host" bind:clientWidth={W} bind:clientHeight={H}>
+    <div class="host" class:turning={!!turn} bind:clientWidth={W} bind:clientHeight={H}>
       <iframe
         bind:this={frame}
         title="Book text"
         sandbox="allow-same-origin"
         referrerpolicy="no-referrer"
-        style:width="{Math.floor(W)}px"
-        style:height="{Math.floor(H)}px"
+        style={layers.main}
+        style:width="{iw}px"
+        style:height="{ih}px"
         class:hidden={loading}
       ></iframe>
+      <!-- The page being turned (see the component comment). Same sandbox; never interactive. -->
+      <iframe
+        bind:this={peel}
+        class="peel"
+        title="Page turn"
+        aria-hidden="true"
+        tabindex="-1"
+        inert
+        sandbox="allow-same-origin"
+        referrerpolicy="no-referrer"
+        style={layers.peel}
+        style:width="{iw}px"
+        style:height="{ih}px"
+      ></iframe>
+      {#if layers.shadow}<div class="turn-layer" style="z-index: 2; {layers.shadow}"></div>{/if}
+      {#if layers.flap}<div class="turn-layer flap-shadow"><div class="turn-layer" style={layers.flap}></div></div>{/if}
+      {#if turn}
+        <!-- Mid-turn the frames are moving or clipped: catch taps and swipes here so quick ones still turn pages. -->
+        <div
+          class="turn-catch"
+          role="presentation"
+          onclick={(e) => {
+            const zone = clickZone(e, e.currentTarget);
+            if (zone === 'left') (rtl ? next : prev)();
+            else if (zone === 'right') (rtl ? prev : next)();
+            else visible = !visible;
+          }}
+          use:swipe={{ enabled: bs.swipe, onSwipe: (dir) => ((dir === 'left') !== rtl ? next : prev)() }}
+        ></div>
+      {/if}
     </div>
     {#if error || chapterError}
       <div class="message" role="alert">
@@ -598,7 +894,7 @@
         <p>{error ?? `This section could not be shown: ${chapterError}`}</p>
         {#if chapterError && spine < total - 1}<button class="btn small" type="button" onclick={() => loadChapter(spine + 1, { kind: 'start' })}>Next section</button>{/if}
       </div>
-    {:else if loading}
+    {:else if loading && !turn}
       <div class="message"><div class="spinner"></div></div>
     {/if}
   </div>
@@ -619,6 +915,9 @@
     overflow: hidden;
   }
   iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
     display: block;
     border: 0;
     background: transparent;
@@ -626,6 +925,32 @@
   }
   iframe.hidden {
     visibility: hidden;
+  }
+  .peel {
+    pointer-events: none;
+  }
+  .turning iframe {
+    will-change: transform, clip-path;
+  }
+  .turn-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .turn-catch {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+  }
+  /* drop-shadow follows the flap's clip-path because it sits on the parent. */
+  .flap-shadow {
+    z-index: 4;
+    filter: drop-shadow(0 0 6px rgb(0 0 0 / 0.28));
+  }
+  .hint {
+    margin: 0;
+    font-size: 12px;
+    color: var(--text-3);
   }
   .message {
     position: absolute;

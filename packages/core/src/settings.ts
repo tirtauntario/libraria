@@ -4,6 +4,8 @@ export type FitMode = 'contain' | 'width' | 'height' | 'original';
 export type BookFlow = 'paginated' | 'scrolled';
 export type BookTheme = 'light' | 'sepia' | 'dark';
 export type BookFont = 'publisher' | 'serif' | 'sans' | 'dyslexic' | 'mono';
+/** Animation when a paginated EPUB page turns. */
+export type PageTurn = 'none' | 'slide' | 'curl';
 export type LibraryView = 'grid' | 'list';
 export type LibrarySort = 'name' | 'lastRead' | 'added';
 
@@ -31,6 +33,9 @@ export interface SyncedSettings {
     margin: number;
     wordSpacing: number;
     justify: boolean;
+    /** Paginated: turn pages by swiping. */
+    swipe: boolean;
+    pageTurn: PageTurn;
   };
   library: {
     view: LibraryView;
@@ -68,6 +73,8 @@ export const DEFAULT_SYNCED_SETTINGS: SyncedSettings = {
     margin: 5,
     wordSpacing: 0,
     justify: false,
+    swipe: true,
+    pageTurn: 'slide',
   },
   library: { view: 'grid', sort: 'lastRead', group: true, groupRenames: {} },
   oauth: { googleClientId: '', dropboxAppKey: '' },
