@@ -30,7 +30,7 @@
     <span class="mobile-logo"><Logo size={30} /></span>
     <h1>{catalog.books.length ? 'Reading' : 'Welcome'}</h1>
     {#if catalog.books.length}
-      <button class="btn primary add" type="button" onclick={pickFiles} disabled={importer.busy}>
+      <button class="btn primary add" type="button" onclick={pickFiles} disabled={importer.busy} aria-label="Add books">
         <Icon name="plus" size={18} /><span>Add books</span>
       </button>
     {/if}

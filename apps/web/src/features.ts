@@ -8,3 +8,4 @@
  *   import './lib/sources/webdav';
  */
 import './features/sources'; // folder, WebDAV, Google Drive, Dropbox: settings, sign-in, rescans
+import './features/server'; // Libraria servers: join, browse, submit, admin, encrypted sync
