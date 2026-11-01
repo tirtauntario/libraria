@@ -11,6 +11,7 @@
   "scripts": {
     "dev:web": "pnpm --filter @libraria/web dev",
     "dev:server": "pnpm --filter @libraria/server dev",
+    "device": "pnpm --filter @libraria/web device",
     "build": "pnpm -r build",
     "check": "pnpm -r check",
     "test": "pnpm -r test",

@@ -4,6 +4,7 @@ The Libraria PWA: an offline-first reader for EPUB, PDF and comics (CBZ, CBR). S
 
 ```sh
 pnpm --filter @libraria/web dev       # dev server
+pnpm --filter @libraria/web device    # production build named "Libraria - Dev", served on :4173 (phone testing)
 pnpm --filter @libraria/web check     # svelte-check (0 errors, 0 warnings)
 pnpm --filter @libraria/web test      # vitest (fake-indexeddb)
 pnpm --filter @libraria/web build     # production build + service worker
@@ -138,6 +139,16 @@ All three share `ReaderChrome.svelte` (top bar with back, bookmark toggle, conte
 `vite-plugin-pwa` (generateSW): the app shell, workers and pdf.js are precached, so the app loads offline after the first visit. Update prompt via a toast; install prompt on Home (Chromium) and instructions in Settings. The manifest declares `file_handlers` for .epub/.pdf/.cbz/.cbr (desktop Chromium; files arrive through `launchQueue`) and a `share_target` (Android): `public/share-target.js`, loaded into the generated worker with `importScripts`, receives the multipart POST, parks the files in the `libraria-share` cache and redirects to the app, which imports them on start (`takeSharedFiles`). iOS supports neither, so there the file picker is the way in. The build uses a relative base, so it works at a domain root, a sub-path, or served by a Libraria server.
 
 Version: `__APP_VERSION__` (package.json) and `__APP_BUILD__` (`BuildInfo` from `scripts/build-info.mjs`: commit, release or not) are defined at build time. `src/lib/version.ts` labels the build, bundles `CHANGELOG.md` (`?raw`) for the What's new page (`#/changelog`, Unreleased notes only in non-release builds), and toasts once after an update to a newer version (`libraria:version-seen` in localStorage). See "Versions and releases" in the root README.
+
+### Testing on a phone (USB)
+
+The dev server has no service worker or manifest, so test install, offline and the system-bar colours on a production build. `pnpm device` (from the root) builds in the `device` mode into `dist-device/` and serves it on port 4173. Its name comes from `.env.device`, "Libraria - Dev", so it installs next to the real app (`.env` and `.env.development` name the other modes).
+
+1. On the phone: Developer options → USB debugging, and connect it.
+2. In desktop Chrome, `chrome://inspect` → Port forwarding → `4173` → `localhost:4173`.
+3. On the phone, open `http://localhost:4173` in Chrome. `localhost` is a secure context, so the service worker, OPFS and installing all work. "inspect" in `chrome://inspect` gives DevTools for the phone's page.
+
+Rebuild (rerun `pnpm device`) after changes. The installed copy only loads while the Mac serves it and the phone is connected, and its library is separate from the Pages install.
 
 ## Not done yet
 
