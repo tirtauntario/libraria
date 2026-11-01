@@ -47,7 +47,7 @@
     footer?: Snippet;
     children: Snippet;
     /** Colour of the bars: dark glass over comics/PDF, or matching the EPUB page. */
-    tone?: 'dark' | 'light' | 'sepia';
+    tone?: 'dark' | 'dim' | 'light' | 'sepia';
   } = $props();
 
   const AUTO_HIDE_MS = 3000;
@@ -216,6 +216,12 @@
     --bar-fg: #efece6;
     --bar-sub: rgb(239 236 230 / 0.65);
     --bar-border: rgb(255 255 255 / 0.08);
+  }
+  .tone-dim {
+    --bar-bg: rgb(43 45 44 / 0.9);
+    --bar-fg: #d9d5ce;
+    --bar-sub: rgb(217 213 206 / 0.65);
+    --bar-border: rgb(255 255 255 / 0.07);
   }
   .tone-light {
     --bar-bg: rgb(250 248 244 / 0.9);

@@ -7,13 +7,15 @@ import {
 import type { UiState } from '../db/schema';
 import type { Repo } from '../db/repo';
 
-export type AppTheme = 'system' | 'light' | 'dark';
+export type AppTheme = 'system' | 'light' | 'dim' | 'dark';
 const THEME_KEY = 'libraria:theme';
+/** Must match --bg in app.css (and the pre-paint script in index.html). */
+const THEME_COLORS: Partial<Record<AppTheme, string>> = { light: '#f7f5f0', dim: '#2b2d2c', dark: '#121514' };
 
 function readTheme(): AppTheme {
   try {
     const t = localStorage.getItem(THEME_KEY);
-    return t === 'light' || t === 'dark' ? t : 'system';
+    return t === 'light' || t === 'dim' || t === 'dark' ? t : 'system';
   } catch {
     return 'system';
   }
@@ -89,6 +91,11 @@ class SettingsState {
     }
     if (theme === 'system') delete document.documentElement.dataset.theme;
     else document.documentElement.dataset.theme = theme;
+    // Browser/system bar colour: follow a manual choice, else the media queries in index.html.
+    for (const meta of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
+      meta.dataset.default ??= meta.content;
+      meta.content = THEME_COLORS[theme] ?? meta.dataset.default;
+    }
   }
 
   /** Write pending changes now (before unload). */
