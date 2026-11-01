@@ -6,6 +6,8 @@ Add notes under **Unreleased** as changes land, in `### Added`, `### Changed`, `
 
 ## Unreleased
 
+## 0.1.0 - 2026-11-01
+
 ### Added
 
 - Reader for EPUB, PDF and comics (CBZ, CBR) that works fully offline, installable as a web app on phones, tablets and computers.
