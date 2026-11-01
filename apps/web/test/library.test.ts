@@ -160,12 +160,30 @@ describe('scanning and opening remote books', () => {
     expect(await s.repo.getOffline(local.id)).toBeUndefined(); // device copy makes the download redundant
     expect((await s.repo.listBookFiles(local.id)).map((f) => f.sourceId).sort()).toEqual([src.id, (await s.repo.meta()).localSourceId].sort());
 
-    // A changed file becomes a new placeholder; a deleted one is pruned.
+    // A changed file becomes a new placeholder. A deleted one found nowhere
+    // else stays, marked missing (unavailable), so the book keeps its place.
     remoteFiles.set('comics/Solo.cbz', await cbzFile('Solo.cbz', 4, 'changed'));
     remoteFiles.delete('other/Elsewhere.epub');
     const r2 = await scanSource(src, '', s);
     expect(r2).toMatchObject({ added: 0, updated: 1, unchanged: 1, removed: 1 });
-    expect((await s.repo.listBooks()).map((b) => b.title).sort()).toEqual(['Shared v01', 'Solo']);
+    expect((await s.repo.listBooks()).map((b) => b.title).sort()).toEqual(['Elsewhere', 'Shared v01', 'Solo']);
+    const gone = await s.repo.getFileByPath(src.id, 'other/Elsewhere.epub');
+    expect(gone?.missing).toBe(true);
+    const elsewhere = (await s.repo.listBooks()).find((b) => b.title === 'Elsewhere')!;
+    await expect(openBook(elsewhere.id, s)).rejects.toThrow(/removed from its source/);
+    // Rescanning again does not count it twice; it comes back when the file does.
+    expect(await scanSource(src, '', s)).toMatchObject({ removed: 0 });
+    remoteFiles.set('other/Elsewhere.epub', await epubFile('Elsewhere.epub'));
+    const r3 = await scanSource(src, '', s);
+    expect(r3).toMatchObject({ added: 0, removed: 0 });
+    expect((await s.repo.getFileByPath(src.id, 'other/Elsewhere.epub'))?.bookId).toBeDefined();
+    expect((await s.repo.getFileByPath(src.id, 'other/Elsewhere.epub'))?.missing).toBe(false);
+
+    // A removed copy of a book that is also on the device is simply forgotten.
+    remoteFiles.delete('comics/Shared v01.cbz');
+    await scanSource(src, '', s);
+    expect(await s.repo.getFileByPath(src.id, 'comics/Shared v01.cbz')).toBeUndefined();
+    expect(await s.repo.getBook(local.id)).toBeDefined();
   });
 
   it('downloads into the file store on open, then reads offline', async () => {

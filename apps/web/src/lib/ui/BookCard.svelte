@@ -5,16 +5,23 @@
   import Icon from './Icon.svelte';
   import { formatPercent } from './format';
 
-  let { book, remote = false, eager = false }: { book: CatalogItem; remote?: boolean; eager?: boolean } = $props();
+  let {
+    book,
+    remote = false,
+    eager = false,
+    unavailable = false,
+  }: { book: CatalogItem; remote?: boolean; eager?: boolean; unavailable?: boolean } = $props();
   const subtitle = $derived(book.authors[0] ?? book.series ?? '');
   const finished = $derived(book.percent != null && book.percent >= 0.995);
 </script>
 
-<article class="card-book">
+<article class="card-book" class:unavailable>
   <a class="open" href={href('/read', book.id)} aria-label="Read {book.title}">
     <div class="cover-wrap">
       <BookCover cover={book.cover} title={book.title} format={book.format} {eager} />
-      {#if remote}
+      {#if unavailable}
+        <span class="badge warn" title="Removed from its source; no copy on this device"><Icon name="alert" size={14} label="Unavailable" /></span>
+      {:else if remote}
         <span class="badge" title="Not downloaded to this device"><Icon name="cloud" size={14} /></span>
       {/if}
       {#if book.percent != null && book.percent > 0}
@@ -68,6 +75,13 @@
     border-radius: 999px;
     background: rgb(0 0 0 / 0.55);
     color: #fff;
+  }
+  .badge.warn {
+    background: var(--warning);
+  }
+  .unavailable .cover-wrap {
+    opacity: 0.55;
+    filter: grayscale(0.7);
   }
   .progress {
     position: absolute;

@@ -2,6 +2,7 @@
 // driver module replaces its stub when it registers the same kind.
 import './stubs';
 import './local';
+import './register';
 
 export * from './registry';
 export * from './types';

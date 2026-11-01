@@ -75,13 +75,13 @@
   {#if lib.view === 'grid'}
     <div class="grid">
       {#each list as book (book.id)}
-        <BookCard {book} remote={!catalog.onDevice(book.id)} />
+        <BookCard {book} remote={!catalog.onDevice(book.id)} unavailable={catalog.unavailableIds.has(book.id)} />
       {/each}
     </div>
   {:else}
     <div class="list">
       {#each list as book (book.id)}
-        <BookRow {book} remote={!catalog.onDevice(book.id)} />
+        <BookRow {book} remote={!catalog.onDevice(book.id)} unavailable={catalog.unavailableIds.has(book.id)} />
       {/each}
     </div>
   {/if}

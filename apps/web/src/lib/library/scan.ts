@@ -85,6 +85,22 @@ export async function dropIfOrphan(bookId: string, s: Services): Promise<boolean
   return true;
 }
 
+/**
+ * A file disappeared from its source. If the book is still somewhere else,
+ * forget this location. Otherwise keep the record, marked missing: the book
+ * stays in its libraries, readable from an offline copy if there is one,
+ * else shown as unavailable. Progress and bookmarks are never touched.
+ */
+export async function removeLocation(rec: BookFileRecord, s: Services): Promise<'deleted' | 'missing'> {
+  const others = (await s.repo.listBookFiles(rec.bookId)).filter((f) => f.id !== rec.id && !f.missing);
+  if (others.length > 0) {
+    await s.repo.deleteBookFile(rec.id);
+    return 'deleted';
+  }
+  await s.repo.putBookFile({ ...rec, missing: true });
+  return 'missing';
+}
+
 export async function scanSource(source: Source, rootPath: string, s: Services, opts: ScanOptions = {}): Promise<ScanResult> {
   const driver = s.driver(source);
   const result: ScanResult = { added: 0, updated: 0, unchanged: 0, removed: 0 };
@@ -97,8 +113,14 @@ export async function scanSource(source: Source, rootPath: string, s: Services, 
     const existing = await s.repo.getFileByPath(source.id, entry.path);
     const now = Date.now();
 
+    const displayPath = entry.displayPath ?? null;
     if (existing && sameFile(existing, entry)) {
-      result.unchanged++;
+      if (existing.missing || (existing.displayPath ?? null) !== displayPath) {
+        // Back again (or renamed parent folder on Drive): same file, same book.
+        await s.repo.putBookFile({ ...existing, missing: false, displayPath });
+      }
+      if (existing.missing) result.updated++;
+      else result.unchanged++;
       continue;
     }
 
@@ -121,6 +143,8 @@ export async function scanSource(source: Source, rootPath: string, s: Services, 
       mtime: entry.mtime,
       etag: entry.etag,
       addedAt: existing?.addedAt ?? now,
+      displayPath,
+      missing: false,
     };
     await s.repo.putBookFile(rec);
     if (existing) {
@@ -137,8 +161,8 @@ export async function scanSource(source: Source, rootPath: string, s: Services, 
       if (!inFolder(rec.path, rootPath) || seen.has(rec.path)) continue;
       // Only prune folders that were walked.
       if (!(opts.recursive ?? true) && rec.path.slice(rootPath ? rootPath.length + 1 : 0).includes('/')) continue;
-      await s.repo.deleteBookFile(rec.id);
-      await dropIfOrphan(rec.bookId, s);
+      if (rec.missing) continue;
+      await removeLocation(rec, s);
       result.removed++;
     }
   }

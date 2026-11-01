@@ -55,6 +55,13 @@ export interface BookFileRecord {
   mtime: number | null;
   etag: string | null;
   addedAt: number;
+  /** Human-readable path when `path` is made of ids (Google Drive). */
+  displayPath?: string | null;
+  /**
+   * The last scan did not find the file. The record stays so the book stays
+   * in its libraries (with its offline copy, if any) instead of vanishing.
+   */
+  missing?: boolean;
 }
 
 /** A downloaded copy of a remote book, kept in the file store (OPFS). */

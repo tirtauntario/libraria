@@ -5,7 +5,7 @@
   import Icon from './Icon.svelte';
   import { FORMAT_LABEL, formatBytes, formatPercent, formatRelative } from './format';
 
-  let { book, remote = false }: { book: CatalogItem; remote?: boolean } = $props();
+  let { book, remote = false, unavailable = false }: { book: CatalogItem; remote?: boolean; unavailable?: boolean } = $props();
 </script>
 
 <article class="row">
@@ -27,7 +27,8 @@
       <span class="dot">·</span>
       <span>{FORMAT_LABEL[book.format]}</span>
       {#if book.fileSize}<span class="dot">·</span><span>{formatBytes(book.fileSize)}</span>{/if}
-      {#if remote}<span class="dot">·</span><Icon name="cloud" size={14} label="Not downloaded" />{/if}
+      {#if unavailable}<span class="dot">·</span><span class="warn"><Icon name="alert" size={14} /> Unavailable</span>
+      {:else if remote}<span class="dot">·</span><Icon name="cloud" size={14} label="Not downloaded" />{/if}
     </div>
   </div>
   <a class="icon-btn" href={href('/book', book.id)} aria-label="Details for {book.title}">
@@ -36,6 +37,12 @@
 </article>
 
 <style>
+  .warn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--warning);
+  }
   .row {
     display: flex;
     align-items: center;

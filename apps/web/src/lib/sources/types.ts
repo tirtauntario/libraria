@@ -25,6 +25,8 @@ export interface SourceEntry {
   etag: string | null;
   /** SHA-512 if the source already knows it (Libraria servers do). Saves hashing. */
   sha512?: string | null;
+  /** Human-readable path when `path` is made of ids (Google Drive). */
+  displayPath?: string | null;
 }
 
 export interface ReadOptions {
@@ -95,4 +97,8 @@ export interface SourceKindDefinition {
   setup?: Component<SourceSetupProps>;
   /** Users can add sources of this kind from the UI. False for 'local'. */
   userCreatable: boolean;
+  /** Shown instead of the option when `isSupported()` is false. */
+  unsupportedHint?: string;
+  /** Paths are opaque ids (Drive): folders are picked by browsing, never typed. */
+  pathsAreIds?: boolean;
 }
