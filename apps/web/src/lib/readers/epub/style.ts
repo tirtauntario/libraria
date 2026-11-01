@@ -8,7 +8,7 @@ import type { BookFont, BookTheme, SyncedSettings } from '@libraria/core';
 export const BOOK_THEMES: Record<BookTheme, { bg: string; fg: string; link: string; muted: string; scheme: 'light' | 'dark' }> = {
   light: { bg: '#fbfaf7', fg: '#1f1d1a', link: '#24584b', muted: '#6f6a62', scheme: 'light' },
   sepia: { bg: '#f4ecd8', fg: '#3b2f22', link: '#7a4b16', muted: '#7a6a55', scheme: 'light' },
-  dim: { bg: '#2b2d2c', fg: '#cfcac2', link: '#8fd0bb', muted: '#8f8a82', scheme: 'dark' },
+  dim: { bg: '#3b3d3c', fg: '#d6d1c9', link: '#8fd0bb', muted: '#a5a098', scheme: 'dark' },
   dark: { bg: '#161817', fg: '#d8d4cc', link: '#8fd0bb', muted: '#8f8a82', scheme: 'dark' },
 };
 

@@ -18,7 +18,7 @@
       // Apply the saved theme before first paint to avoid a flash.
       try {
         var t = localStorage.getItem('libraria:theme');
-        var c = { light: '#f7f5f0', dim: '#2b2d2c', dark: '#121514' }[t];
+        var c = { light: '#f7f5f0', dim: '#3b3d3c', dark: '#121514' }[t];
         if (c) {
           document.documentElement.dataset.theme = t;
           document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) {
