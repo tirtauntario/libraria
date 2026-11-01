@@ -7,7 +7,8 @@ pnpm --filter @libraria/web dev       # dev server
 pnpm --filter @libraria/web check     # svelte-check (0 errors, 0 warnings)
 pnpm --filter @libraria/web test      # vitest (fake-indexeddb)
 pnpm --filter @libraria/web build     # production build + service worker
-pnpm --filter @libraria/web e2e       # Playwright smoke test against `vite preview`
+pnpm --filter @libraria/web e2e       # Playwright: smoke test against `vite preview`, and server.spec.ts
+                                      # against a real server (built from apps/server) serving dist/
 pnpm --filter @libraria/web icons     # re-render PNG icons from the SVG logo
 ```
 
@@ -50,6 +51,7 @@ src/
 | `libraries`, `sources` | `id` | core `Library` / `Source` |
 | `settings` | name | singletons: `synced`, `syncedUpdatedAt`, `device`, `meta` (device id, built-in source/library ids), `ui`; extensions may add namespaced keys via `repo.getValue/setValue` |
 | `changes` | sync logical key | outbox, see below |
+| `uploads` (v2) | `id` | books being sent to Libraria servers: server source, book, SHA-512, submission id, confirmed offset, status; indexes `bookId`, `sourceId` |
 
 Migrations: append a function to `MIGRATIONS` in `src/lib/db/schema.ts`; never edit a released one. The version is `MIGRATIONS.length`.
 
@@ -91,6 +93,21 @@ Reuse, don't rewrite:
 - Sync state (cursor/rev, keys): `repo.getValue('sync:…')` / `setValue`. Device setting `autoSync` exists for it.
 - The UI re-queries on `repo.events` topics (`books`, `progress`, `bookmarks`, `libraries`, `sources`, `settings`, `offline`); repo writes emit them, so merged data appears without extra wiring.
 
+## Libraria servers and sync (built)
+
+Code: `src/lib/server/` (API client, registry, `libraria` source, uploads), `src/lib/sync/` (keys, engine, controller) and `src/features/server/` (pages, panels, startup). The feature registers itself from `src/features.ts`.
+
+- **Joining**: `#/join` (also `#/join?server=<url>&invite=<token>` from invite links). The address is normalized; plain `http://` is only allowed for localhost, and a blocked mixed-content request is explained. `/info` decides between first-run owner setup (setup token + library name), sign up, sign in and "Browse as guest" (when the server allows anonymous access). Argon2id runs in a worker (`lib/server/kdf.ts`); registration uses a random salt and `DEFAULT_KDF`. Accounts that wait for approval are listed on `#/servers` until the user signs in.
+- **Registry**: a joined server is a `libraria` source whose id is the server's id, plus a library with the same id and name. Every device that joins the server creates the same records, so sync merges them instead of duplicating the server. Per-device state (cached `/info`, session expired, refresh times) is in `repo.getValue('server:state:<id>')`. A 401 on a request that carried the token marks the session expired; the UI offers to sign in again.
+- **Catalog**: `refreshServerCatalog()` lists `/books`, runs the generic `scanSource()` (entries carry the SHA-512, so local copies link at once), copies server metadata into books that only live on servers, and caches covers. It runs on app start and when coming online (at most every 5 minutes), when a server page opens (1 minute) and on "Refresh". Downloads stream into OPFS and resume with `Range` after a dropped connection.
+- **Contributions**: "Send to server…" on a book page or "Send a book…" on the server page queue an upload job (`uploads` store). Jobs look the SHA-512 up first, create the submission, send `UPLOAD_CHUNK_BYTES` chunks and resume from `HEAD` after reloads; offline jobs wait for app start or the `online` event. Pending jobs poll for the review result; once approved, the local cover is uploaded if the server has none.
+- **Server pages** (`#/server/<id>?tab=`): books, my submissions, review queue (open the pending file read-only at `#/server/<id>/review/<submission>`), members, invites, library settings and disk sources by role, account (password change, sign out, remove).
+- **Sync** (`#/sync`, Settings → Sync): the login password is the sync password. Setting up on the first device creates the data key, wraps it with the master key and a recovery key (shown once, with copy, download and an "I saved it" check). Other devices unwrap it with the master key from signing in, or with the recovery key, which then re-wraps it for the current password. Changing the password on a sync device re-wraps the key. "Delete synced data" calls `DELETE /sync`.
+  - **Device-trusted model**: after setup or unlock this device stores the raw data key in IndexedDB (`sync:key`), so sync runs without the password. Anyone who can open this browser profile can read it, as they can read the books and progress next to it. "Forget sync key" deletes it.
+  - The sync home is per device (`sync:key` names it), not part of the synced config: a new device has to sign in to unlock the key anyway.
+  - Engine: check the keys still match → pull since the cursor (paged), decrypt, `applyRemote*` → push the outbox with `ref = HMAC(logical key)` and the last rev seen per ref (`sync:revs`); conflicts are decrypted, merged with the core rules, applied or re-pushed. Device-only sources and the built-in library never leave the device; refs to device-only sources are stripped from synced libraries and kept on each device. Triggers: start, local changes (3 s debounce), online, every 2 minutes while visible, "Sync now"; automatic runs follow the device setting "Sync automatically".
+  - Source records sync with their credentials (WebDAV passwords, OAuth tokens, server session tokens), encrypted. Signing out of a server clears its token on every synced device.
+
 ## Readers
 
 All three share `ReaderChrome.svelte` (top bar with back, bookmark toggle, contents, bookmarks, settings, fullscreen; bottom bar; auto-hide after 3 s; side sheets). They receive `ReaderProps` and report positions through `onlocation`; `ReaderPage` saves progress debounced (500 ms) and on page hide.
@@ -105,7 +122,7 @@ All three share `ReaderChrome.svelte` (top bar with back, bookmark toggle, conte
 
 ## Not done yet
 
-- Real drivers for folder, WebDAV, Google Drive, Dropbox and Libraria servers (stubs show "coming soon").
+- Real drivers for folder, WebDAV, Google Drive and Dropbox (stubs show "coming soon").
 - EPUB positions use spine + progression, not CFI (the plan mentions CFI).
 - The "Readable" font uses OpenDyslexic / Atkinson Hyperlegible only if installed; no font files are bundled.
 - Fixed-layout EPUBs and vertical writing are rendered as reflowable text.

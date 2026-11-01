@@ -92,6 +92,9 @@
     display: grid;
     gap: 12px;
   }
+  .sync-setup > .btn {
+    justify-self: end;
+  }
   .status,
   .ok {
     display: flex;

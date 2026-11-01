@@ -181,7 +181,19 @@ test('server: setup, uploads, approval, offline download, review, sync', async (
   await serverTab(op, serverId, 'invites');
   await op.getByRole('button', { name: 'New invite' }).click();
   await expect(op.getByTestId('invite-link')).toContainText('#/join?server=');
+  const inviteUrl = (await op.getByTestId('invite-link').locator('code').textContent())!.trim();
   await shots(op, 'invites');
+
+  // An invite link opens the join flow prefilled; in a private library it skips approval.
+  const invited = await newContext(browser, MOBILE);
+  await invited.page.goto(inviteUrl);
+  await expect(invited.page.getByTestId('server-info')).toContainText('You have an invite link.');
+  await fillAuth(invited.page, 'ivy', 'ivy password 789', { register: true, sync: false });
+  await invited.page.getByRole('button', { name: 'Create account' }).last().click();
+  await expect(invited.page.getByRole('heading', { name: 'Night Owls', level: 1 })).toBeVisible({ timeout: 60_000 });
+  await invited.context.close();
+  await op.reload();
+  await expect(op.getByText('Used', { exact: true })).toBeVisible();
   await serverTab(op, serverId, 'settings');
   await expect(op.getByLabel('Name', { exact: true })).toHaveValue('Night Owls');
   await shots(op, 'settings');
