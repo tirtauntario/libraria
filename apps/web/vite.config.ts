@@ -63,8 +63,40 @@ export default defineConfig({
           },
         ],
         launch_handler: { client_mode: 'focus-existing' },
+        // Android: appear in the share sheet for books (public/share-target.js receives them).
+        // file_handlers above is desktop-only; iOS supports neither.
+        share_target: {
+          action: './share-target',
+          method: 'POST',
+          enctype: 'multipart/form-data',
+          params: {
+            files: [
+              {
+                name: 'books',
+                // Android often labels comics as plain zip/rar or as octet-stream.
+                accept: [
+                  'application/epub+zip',
+                  'application/pdf',
+                  'application/vnd.comicbook+zip',
+                  'application/vnd.comicbook-rar',
+                  'application/x-cbz',
+                  'application/x-cbr',
+                  'application/zip',
+                  'application/vnd.rar',
+                  'application/x-rar-compressed',
+                  'application/octet-stream',
+                  '.epub',
+                  '.pdf',
+                  '.cbz',
+                  '.cbr',
+                ],
+              },
+            ],
+          },
+        },
       },
       workbox: {
+        importScripts: ['share-target.js'],
         globPatterns: ['**/*.{js,mjs,css,html,svg,png,ico,webmanifest,wasm}'],
         // pdf.js worker and the app chunks are larger than workbox's 2 MB default.
         maximumFileSizeToCacheInBytes: 12 * 1024 * 1024,

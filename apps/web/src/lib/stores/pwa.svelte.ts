@@ -26,6 +26,16 @@ export function detectPlatform(ua = typeof navigator !== 'undefined' ? navigator
   return 'other';
 }
 
+/** How to install on each platform (Settings and About). */
+export const INSTALL_HELP: Record<Platform, string> = {
+  ios: 'In Safari, tap Share, then “Add to Home Screen”. On iPhone and iPad, offline storage is only dependable for the installed app.',
+  android: 'Open the browser menu and choose “Install app” or “Add to Home screen”.',
+  'mac-safari': 'In Safari, choose File › Add to Dock.',
+  chromium: 'Use the install icon in the address bar, or the browser menu › “Install Libraria”.',
+  firefox: 'Firefox on desktop cannot install web apps. Libraria still works in the browser tab.',
+  other: 'Look for “Install” or “Add to Home Screen” in your browser menu.',
+};
+
 class PwaState {
   installed = $state(standalone());
   canPrompt = $state(false);

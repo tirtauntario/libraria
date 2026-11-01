@@ -108,4 +108,28 @@ export function listenForLaunchFiles(): void {
     const files = await Promise.all(params.files.map((h) => h.getFile()));
     importer.add(files);
   });
+  void takeSharedFiles()
+    .then((files) => files.length && importer.add(files))
+    .catch(() => {});
+}
+
+/** Same name and headers as public/share-target.js. */
+export const SHARE_CACHE = 'libraria-share';
+
+/**
+ * PWA share_target (Android): the service worker parks shared files in a
+ * cache and opens the app. Returns them and empties the cache.
+ */
+export async function takeSharedFiles(storage: CacheStorage | undefined = globalThis.caches): Promise<File[]> {
+  if (!storage || !(await storage.has(SHARE_CACHE))) return [];
+  const cache = await storage.open(SHARE_CACHE);
+  const files: File[] = [];
+  for (const req of await cache.keys()) {
+    const res = await cache.match(req);
+    await cache.delete(req);
+    if (!res) continue;
+    const name = decodeURIComponent(res.headers.get('x-libraria-name') ?? '') || 'Shared book';
+    files.push(new File([await res.blob()], name, { type: res.headers.get('content-type') ?? '' }));
+  }
+  return files;
 }

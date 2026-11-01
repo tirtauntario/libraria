@@ -42,6 +42,7 @@
     {#if !net.online}
       <p class="offline"><Icon name="wifi-off" size={16} /> Offline</p>
     {/if}
+    <a class="about-link" href="#/about"><Icon name="info" size={16} /> About Libraria</a>
   </aside>
 
   <main id="main" tabindex="-1">
@@ -226,6 +227,24 @@
       padding: 8px 10px;
       color: var(--text-3);
       font-size: 13px;
+    }
+    .about-link {
+      margin-top: auto;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 10px;
+      border-radius: var(--radius);
+      color: var(--text-3);
+      font-size: 13px;
+      text-decoration: none;
+    }
+    .offline + .about-link {
+      margin-top: 0;
+    }
+    .about-link:hover {
+      color: var(--text);
+      background: var(--surface-2);
     }
   }
 </style>

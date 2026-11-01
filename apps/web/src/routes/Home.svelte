@@ -47,6 +47,7 @@
         <button class="btn primary" type="button" onclick={pickFiles}><Icon name="plus" size={18} /> Add books</button>
       </div>
       <p class="subtle hint">You can also drop files anywhere on this page.</p>
+      <p class="subtle hint"><a href="#/about">New here? What Libraria is and how it works</a></p>
     </section>
   {:else}
     {#if showInstall}

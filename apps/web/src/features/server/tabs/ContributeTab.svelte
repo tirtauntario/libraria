@@ -120,6 +120,7 @@
   {#if candidates.length === 0}
     <p class="muted">No books to send. Books you imported to this device appear here once they are not on this server yet.</p>
   {:else}
+    <p class="muted small">Only send books you have the right to share: your own work, public-domain works, or works whose licence allows it. <a href="#/about">Your content, your responsibility</a></p>
     <input class="input" type="search" placeholder="Filter" bind:value={filter} aria-label="Filter books" />
     <ul class="pick">
       {#each shown as book (book.id)}
