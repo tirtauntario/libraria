@@ -10,7 +10,7 @@ describe('schema', () => {
     expect(db.version).toBe(DB_VERSION);
     expect(DB_VERSION).toBe(MIGRATIONS.length);
     expect([...db.objectStoreNames].sort()).toEqual(
-      ['bookFiles', 'bookmarks', 'books', 'changes', 'fileBlobs', 'libraries', 'offlineFiles', 'progress', 'settings', 'sources'].sort(),
+      ['bookFiles', 'bookmarks', 'books', 'changes', 'fileBlobs', 'libraries', 'offlineFiles', 'progress', 'settings', 'sources', 'uploads'].sort(),
     );
     db.close();
   });

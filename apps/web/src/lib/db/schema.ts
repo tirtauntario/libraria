@@ -81,6 +81,28 @@ export interface ChangeRecord {
   updatedAt: number;
 }
 
+/** A book being sent to a Libraria server (persisted so it survives reloads). */
+export interface UploadJobRecord {
+  id: string;
+  /** The `libraria` source (server) it goes to. */
+  sourceId: string;
+  bookId: string;
+  sha512: string;
+  format: BookFormat;
+  fileSize: number;
+  title: string;
+  submissionId: string | null;
+  /** Bytes the server confirmed. */
+  offset: number;
+  status: 'queued' | 'uploading' | 'pending' | 'approved' | 'exists' | 'rejected' | 'failed';
+  error: string | null;
+  /** Server book id once approved (or when it already existed). */
+  serverBookId: string | null;
+  coverDone: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface DeviceMeta {
   deviceId: string;
   localSourceId: string;
@@ -149,6 +171,12 @@ export interface LibrariaDB extends DBSchema {
     value: ChangeRecord;
     indexes: { updatedAt: number };
   };
+  /** Since v2: queued and running uploads to Libraria servers. */
+  uploads: {
+    key: string;
+    value: UploadJobRecord;
+    indexes: { bookId: string; sourceId: string };
+  };
 }
 
 export type Db = IDBPDatabase<LibrariaDB>;
@@ -191,6 +219,12 @@ export const MIGRATIONS: ((db: Db, tx: UpgradeTx) => void)[] = [
 
     const changes = db.createObjectStore('changes', { keyPath: 'key' });
     changes.createIndex('updatedAt', 'updatedAt');
+  },
+  // v2: upload jobs for contributing books to Libraria servers
+  (db) => {
+    const uploads = db.createObjectStore('uploads', { keyPath: 'id' });
+    uploads.createIndex('bookId', 'bookId');
+    uploads.createIndex('sourceId', 'sourceId');
   },
 ];
 

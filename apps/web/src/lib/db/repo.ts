@@ -421,9 +421,10 @@ export class Repo {
     return (await this.meta()).localLibraryId === id;
   }
 
-  async createLibrary(name: string, sources: LibrarySourceRef[] = []): Promise<Library> {
+  /** `id` lets a feature use a well-known id (e.g. a server's id) so devices create the same record. */
+  async createLibrary(name: string, sources: LibrarySourceRef[] = [], id?: string): Promise<Library> {
     const t = this.now();
-    const lib: Library = { id: uuidv7(t), name, sources, createdAt: t, updatedAt: t, deleted: false };
+    const lib: Library = { id: id ?? uuidv7(t), name, sources, createdAt: t, updatedAt: t, deleted: false };
     await this.putLibrary(lib);
     return lib;
   }
@@ -460,9 +461,9 @@ export class Repo {
     return this.db.get('sources', id);
   }
 
-  async createSource(name: string, config: SourceConfig): Promise<Source> {
+  async createSource(name: string, config: SourceConfig, id?: string): Promise<Source> {
     const t = this.now();
-    const src: Source = { id: uuidv7(t), name, config, createdAt: t, updatedAt: t, deleted: false };
+    const src: Source = { id: id ?? uuidv7(t), name, config, createdAt: t, updatedAt: t, deleted: false };
     await this.putSource(src);
     return src;
   }
