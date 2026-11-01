@@ -91,7 +91,7 @@ export function createApp(ctx: AppContext, limiters: Limiters = createLimiters(c
   // The sync push route has its own, larger JSON limit; uploads stream raw.
   api.use((req, res, next) => (req.path === '/sync/records' ? next() : json(req, res, next)));
   api.use(authenticate(ctx));
-  api.use(limiters.anonymous.middleware((req) => !req.auth));
+  api.use(limiters.anonymous.middleware((req) => !req.auth && !AUTH_PATHS.has(req.path)));
   api.use(accountRoutes(ctx));
   api.use(adminRoutes(ctx));
   api.use(bookRoutes(ctx));

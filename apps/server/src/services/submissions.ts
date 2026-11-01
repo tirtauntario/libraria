@@ -1,5 +1,5 @@
-import { createReadStream, existsSync } from 'node:fs';
-import { open, rename, rm, stat } from 'node:fs/promises';
+import { createReadStream, createWriteStream, existsSync } from 'node:fs';
+import { open, rename, rm, stat, truncate } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
@@ -88,26 +88,28 @@ export async function receiveChunk(ctx: AppContext, req: Request, sub: Submissio
   }
 
   const fh = await open(path, offset === 0 ? 'w' : 'r+');
-  let tooLarge = false;
-  let failure: unknown = null;
   try {
     await fh.truncate(offset);
-    let written = offset;
-    const guard = new Transform({
-      transform(chunk: Buffer, _enc, cb) {
-        written += chunk.length;
-        if (written > sub.file_size) return cb(new TooLarge());
-        cb(null, chunk);
-      },
-    });
-    await pipeline(req, guard, fh.createWriteStream({ start: offset, autoClose: false }));
+  } finally {
+    await fh.close();
+  }
+  let tooLarge = false;
+  let failure: unknown = null;
+  let written = offset;
+  const guard = new Transform({
+    transform(chunk: Buffer, _enc, cb) {
+      written += chunk.length;
+      if (written > sub.file_size) return cb(new TooLarge());
+      cb(null, chunk);
+    },
+  });
+  try {
+    await pipeline(req, guard, createWriteStream(path, { flags: 'r+', start: offset }));
   } catch (err) {
     if (err instanceof TooLarge) tooLarge = true;
     else failure = err;
-  } finally {
-    if (tooLarge) await fh.truncate(offset);
-    await fh.close();
   }
+  if (tooLarge) await truncate(path, offset);
   const size = Math.min((await stat(path)).size, sub.file_size);
   await setOffset(ctx, sub.id, size);
   if (tooLarge) throw new HttpError(413, 'too_large', 'Upload goes past the declared file size');
