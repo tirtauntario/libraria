@@ -16,6 +16,12 @@ export interface SyncedSettings {
     zoom: number;
     spread: boolean;
   };
+  /** PDF pages: layout, fit and zoom (separate from comics). */
+  pdf: {
+    mode: ComicReadingMode;
+    fit: FitMode;
+    zoom: number;
+  };
   book: {
     flow: BookFlow;
     theme: BookTheme;
@@ -52,6 +58,7 @@ export interface DeviceSettings {
 
 export const DEFAULT_SYNCED_SETTINGS: SyncedSettings = {
   comic: { mode: 'paged', direction: 'ltr', fit: 'contain', zoom: 1, spread: false },
+  pdf: { mode: 'continuous', fit: 'width', zoom: 1 },
   book: {
     flow: 'paginated',
     theme: 'light',
