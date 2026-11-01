@@ -172,8 +172,12 @@ Both server and client are configurable. Each setting lives in exactly one place
 | Members may submit books | on |
 | Allowed formats | CBZ, CBR, EPUB, PDF |
 | Invite link expiry | 7 days |
+| Invite links skip approval (private library) | on |
+| Anonymous access (public library): `none` \| `browse` (catalog and covers) \| `read` (also open and download) | `none` |
 
 Owner and curator uploads skip quota and approval.
+
+Anonymous visitors never sync or submit, since both need an account. Anonymous requests are rate-limited per IP address.
 
 ### Client
 
@@ -262,8 +266,3 @@ Client (IndexedDB stores) and server (SQLite tables) share these shapes in `pack
 5. Server: first-run setup, accounts, roles, signups, sources, uploads, scanning, book API.
 6. Client: connect to multiple servers, download for offline, submit books; server review queue.
 7. End-to-end encrypted sync home.
-
-## Open questions
-
-1. Public library: can anonymous visitors browse and read, or is an account always required?
-2. Do invite links bypass approval in a private library?
