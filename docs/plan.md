@@ -141,6 +141,60 @@ Decentralized: servers are independent and never talk to each other. The client 
 
 Servers are run by strangers. Treat all server content and metadata as untrusted: sandboxed EPUB rendering, sanitized metadata, and size limits on downloads and covers.
 
+## Configuration
+
+Both server and client are configurable. Each setting lives in exactly one place, so there is never a question of which value wins.
+
+### Server
+
+**Host settings**: config file `libraria.config.json` in the data directory. Environment variables override it (`LIBRARIA_PORT`, etc.). Changing these requires a restart. They are not editable from the web UI, because they control the machine.
+
+| Setting | Default |
+|---|---|
+| `port` | `8080` |
+| `dataDir` | `./data` |
+| `publicUrl` | none; required behind a reverse proxy |
+| `trustProxy` | `false` |
+| `allowedOrigins` (CORS) | the server's own origin plus the official static client |
+| `sourceRoots` — disk paths the owner may add as sources | none |
+| `oauth.google` / `oauth.dropbox` client IDs | none (feature hidden) |
+| `log.level` | `info` |
+
+**Library settings**: stored in the database, edited by the owner in the client. Take effect immediately.
+
+| Setting | Default |
+|---|---|
+| Name, description | set at first run |
+| Visibility | `private` |
+| Max upload file size | 500 MB |
+| Per-member storage quota (pending + approved submissions) | 2 GB |
+| Max pending submissions per member | 20 |
+| Members may submit books | on |
+| Allowed formats | CBZ, CBR, EPUB, PDF |
+| Invite link expiry | 7 days |
+
+Owner and curator uploads skip quota and approval.
+
+### Client
+
+Settings page, stored in IndexedDB. Two groups:
+
+**Synced** (part of the encrypted config, same on all devices):
+
+- Reader: mode, direction, fit, zoom (comics); font, size, margins, spacing, theme (books).
+- Library: view, sort, grouping, custom groups and renames.
+- Libraries, sources, registered servers, sync home.
+
+**Per device** (never synced):
+
+| Setting | Default |
+|---|---|
+| Auto-download a book when opened | on |
+| Download on metered connections | on (the Network Information API is Chromium only) |
+| Offline storage limit | none (browser quota applies) |
+| Auto-remove unpinned books not opened for N days | off |
+| Sync automatically | on |
+
 ## Identity and sync
 
 - Every row has a UUIDv7 primary key, generated where the row is created.
@@ -213,4 +267,3 @@ Client (IndexedDB stores) and server (SQLite tables) share these shapes in `pack
 
 1. Public library: can anonymous visitors browse and read, or is an account always required?
 2. Do invite links bypass approval in a private library?
-3. Upload limits: per-file maximum and per-member quota, set by the owner? Any defaults?
