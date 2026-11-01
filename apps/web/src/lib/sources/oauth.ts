@@ -115,8 +115,8 @@ export async function pkcePair(): Promise<{ verifier: string; challenge: string 
 // --- redirect ------------------------------------------------------------------
 
 /** The redirect URI to register with Google / Dropbox: this page without query or fragment. */
-export function redirectUri(loc: Pick<Location, 'origin' | 'pathname'> = location): string {
-  return loc.origin + loc.pathname;
+export function redirectUri(loc: Pick<Location, 'origin' | 'pathname'> | undefined = globalThis.location): string {
+  return loc ? loc.origin + loc.pathname : '';
 }
 
 /**

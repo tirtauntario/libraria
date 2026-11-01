@@ -1,7 +1,10 @@
 <script lang="ts">
   import type { LibrarySort } from '@libraria/core';
   import { bookIdsInLibrary, groupCatalog, queryBooks, type CatalogQuery } from '../lib/library/catalog';
+  import SourceProblem from '../lib/sources/ui/SourceProblem.svelte';
   import { catalog } from '../lib/stores/catalog.svelte';
+  import { describeScan, scannable, scanner } from '../lib/stores/scanner.svelte';
+  import { toasts } from '../lib/stores/toasts.svelte';
   import { importer, pickFiles } from '../lib/stores/importer.svelte';
   import { settings } from '../lib/stores/settings.svelte';
   import BookCard from '../lib/ui/BookCard.svelte';
@@ -16,6 +19,20 @@
   const hasLocal = $derived(!!library?.sources.some((s) => s.sourceId === catalog.localSourceId));
   const ids = $derived(library ? bookIdsInLibrary(library, catalog.files) : new Set<string>());
   const members = $derived(catalog.books.filter((b) => ids.has(b.id)));
+
+  const libSources = $derived(
+    (library?.sources ?? []).map((r) => catalog.sources.find((s) => s.id === r.sourceId)).filter((s) => s !== undefined),
+  );
+  const canRescan = $derived(libSources.some((s) => scannable(s)));
+  const scanning = $derived(libSources.filter((s) => scanner.busy(s.id)));
+  const found = $derived(scanning.reduce((n, s) => n + (scanner.jobs[s.id]?.found ?? 0), 0));
+  const problems = $derived(libSources.filter((s) => scanner.problems[s.id]));
+
+  async function rescan() {
+    if (!library) return;
+    const { result, failed } = await scanner.scanLibrary(library);
+    if (!failed) toasts.show(`${library.name}: ${describeScan(result)}`);
+  }
 
   let search = $state('');
   let format = $state<NonNullable<CatalogQuery['format']>>('all');
@@ -97,12 +114,25 @@
         <h1>{library.name}</h1>
         <p class="subtle">{plural(members.length, 'book')}</p>
       </div>
+      {#if canRescan}
+        <button class="icon-btn" type="button" aria-label="Rescan library" title="Rescan" onclick={rescan} disabled={scanning.length > 0}>
+          <span class:spin={scanning.length > 0}><Icon name="refresh" /></span>
+        </button>
+      {/if}
       {#if hasLocal}
         <button class="btn primary add" type="button" onclick={pickFiles} disabled={importer.busy}>
           <Icon name="plus" size={18} /><span>Add books</span>
         </button>
       {/if}
     </header>
+
+    {#if scanning.length}
+      <p class="scan subtle" aria-live="polite"><span class="spinner small"></span> Scanning {scanning.map((s) => s.name).join(', ')}… {plural(found, 'book')} found</p>
+    {/if}
+    {#each problems as src (src.id)}
+      {@const problem = scanner.problems[src.id]}
+      {#if problem}<div class="problem"><SourceProblem source={src} {problem} /></div>{/if}
+    {/each}
 
     {#if members.length > 0}
       <div class="toolbar">
@@ -157,7 +187,7 @@
     {#if members.length === 0}
       <div class="empty">
         <Icon name="library" size={36} />
-        <p>No books here yet.</p>
+        <p>{scanning.length ? 'Looking for books…' : 'No books here yet.'}</p>
         {#if hasLocal}
           <button class="btn primary" type="button" onclick={pickFiles}><Icon name="plus" size={18} /> Add books</button>
         {:else}
@@ -247,6 +277,30 @@
       width: 40px;
       padding: 0;
       border-radius: 999px;
+    }
+  }
+  .scan {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: -8px 0 16px;
+    font-size: 13.5px;
+  }
+  .spinner.small {
+    width: 14px;
+    height: 14px;
+    border-width: 2px;
+  }
+  .problem {
+    margin: 0 0 16px;
+  }
+  .spin {
+    display: inline-flex;
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
     }
   }
   .toolbar {
