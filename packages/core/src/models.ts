@@ -15,14 +15,17 @@ export interface BookMeta {
 /**
  * A reading position. Pages are 0-based.
  * EPUB uses spine index plus progression (0..1) inside that chapter, which
- * survives font and layout changes between devices.
+ * survives font and layout changes between devices. `percent` (0..1) is the
+ * position in the whole book as the reader measured it (chapters weighted by
+ * length); older records lack it and fall back to equal-weight chapters.
  */
 export type Locator =
   | { type: 'page'; page: number; total: number }
-  | { type: 'epub'; spine: number; progression: number; total: number; label?: string };
+  | { type: 'epub'; spine: number; progression: number; total: number; label?: string; percent?: number };
 
 export function locatorPercent(loc: Locator): number {
   if (loc.type === 'page') return loc.total > 1 ? loc.page / (loc.total - 1) : 1;
+  if (typeof loc.percent === 'number' && Number.isFinite(loc.percent)) return Math.min(1, Math.max(0, loc.percent));
   if (loc.total <= 0) return 0;
   return Math.min(1, (loc.spine + loc.progression) / loc.total);
 }

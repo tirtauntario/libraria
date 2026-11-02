@@ -184,4 +184,10 @@ describe('sync merge', () => {
     expect(locatorPercent({ type: 'page', page: 9, total: 10 })).toBe(1);
     expect(locatorPercent({ type: 'epub', spine: 1, progression: 0.5, total: 3 })).toBe(0.5);
   });
+
+  it('prefers the measured whole-book percent of an EPUB locator', () => {
+    expect(locatorPercent({ type: 'epub', spine: 1, progression: 0.5, total: 3, percent: 0.9 })).toBe(0.9);
+    expect(locatorPercent({ type: 'epub', spine: 0, progression: 0, total: 3, percent: 1.4 })).toBe(1);
+    expect(locatorPercent({ type: 'epub', spine: 1, progression: 0.5, total: 3, percent: NaN })).toBe(0.5);
+  });
 });

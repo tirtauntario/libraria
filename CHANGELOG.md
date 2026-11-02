@@ -6,6 +6,10 @@ Add notes under **Unreleased** as changes land, in `### Added`, `### Changed`, `
 
 ## Unreleased
 
+### Fixed
+
+- EPUB progress counts pages across the whole book ("Page 57 of 312") instead of starting over in each chapter, and the slider moves through the book page by page. Long and short chapters now take their real share of the bar and of the percentage in the library.
+
 ## 0.1.0 - 2026-11-01
 
 ### Added

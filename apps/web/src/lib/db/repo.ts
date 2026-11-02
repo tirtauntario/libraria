@@ -359,6 +359,23 @@ export class Repo {
     return winner;
   }
 
+  // --- EPUB page counts (device-only cache) -----------------------------------------
+
+  /** Page counts of a book's chapters for one layout, or null if never counted. */
+  async getPageCounts(sha512: string, layout: string): Promise<number[] | null> {
+    return (await this.db.get('pageCounts', `${sha512}:${layout}`))?.counts ?? null;
+  }
+
+  /** Remember page counts for one layout, keeping the few most recent layouts of the book. */
+  async savePageCounts(sha512: string, layout: string, counts: number[], keep = 4): Promise<void> {
+    const tx = this.db.transaction('pageCounts', 'readwrite');
+    await tx.store.put({ id: `${sha512}:${layout}`, sha512, counts, usedAt: this.now() });
+    const all = await tx.store.index('sha512').getAll(sha512);
+    all.sort((a, b) => b.usedAt - a.usedAt);
+    for (const old of all.slice(keep)) await tx.store.delete(old.id);
+    await tx.done;
+  }
+
   // --- bookmarks ----------------------------------------------------------------
 
   async listBookmarks(sha512: string, includeDeleted = false): Promise<Bookmark[]> {

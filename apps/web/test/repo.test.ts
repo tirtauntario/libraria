@@ -10,7 +10,7 @@ describe('schema', () => {
     expect(db.version).toBe(DB_VERSION);
     expect(DB_VERSION).toBe(MIGRATIONS.length);
     expect([...db.objectStoreNames].sort()).toEqual(
-      ['bookFiles', 'bookmarks', 'books', 'changes', 'fileBlobs', 'libraries', 'offlineFiles', 'progress', 'settings', 'sources', 'uploads'].sort(),
+      ['bookFiles', 'bookmarks', 'books', 'changes', 'fileBlobs', 'libraries', 'offlineFiles', 'pageCounts', 'progress', 'settings', 'sources', 'uploads'].sort(),
     );
     db.close();
   });
@@ -23,6 +23,21 @@ describe('schema', () => {
     await s.repo.putBook({ ...base, id: 'c', sha512: 'f'.repeat(128) });
     await expect(s.repo.putBook({ ...base, id: 'd', sha512: 'f'.repeat(128) })).rejects.toThrow();
     expect(await s.repo.getBookBySha('f'.repeat(128))).toMatchObject({ id: 'c' });
+  });
+});
+
+describe('EPUB page counts', () => {
+  it('caches counts per layout, keeps the most recent layouts, and never syncs them', async () => {
+    let t = 0;
+    const s = await testServices(() => ++t);
+    const sha = 'a'.repeat(128);
+    expect(await s.repo.getPageCounts(sha, 'L1')).toBeNull();
+    for (const l of ['L1', 'L2', 'L3']) await s.repo.savePageCounts(sha, l, [1, 2, 3], 2);
+    await s.repo.savePageCounts('b'.repeat(128), 'L1', [9], 2);
+    expect(await s.repo.getPageCounts(sha, 'L1')).toBeNull();
+    expect(await s.repo.getPageCounts(sha, 'L3')).toEqual([1, 2, 3]);
+    expect(await s.repo.getPageCounts('b'.repeat(128), 'L1')).toEqual([9]);
+    expect(await s.repo.listChanges()).toEqual([]);
   });
 });
 
