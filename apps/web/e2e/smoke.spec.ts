@@ -28,6 +28,14 @@ function watchErrors(page: Page): string[] {
   return errors;
 }
 
+/** "Page 12 of 80" in the EPUB footer, once every chapter is counted (no "~"). */
+async function bookPage(page: Page): Promise<{ at: number; total: number }> {
+  const pos = page.locator('.pos');
+  await expect(pos).toHaveText(/Page \d+ of \d+ ·/, { timeout: 15_000 });
+  const m = /Page (\d+) of (\d+)/.exec(await pos.innerText())!;
+  return { at: Number(m[1]), total: Number(m[2]) };
+}
+
 /** Bring the reader controls back (they auto-hide). */
 async function showControls(page: Page) {
   await page.mouse.move(200, 200);
@@ -139,21 +147,48 @@ test('import, read, restore progress, work offline', async ({ page, context }) =
 
   await showControls(page);
   const pos = page.locator('.pos');
-  await expect(pos).toContainText('1 /');
+  await expect(pos).toContainText('Page 1 of');
   await page.keyboard.press('ArrowRight');
-  await expect(pos).toContainText('2 /');
+  await expect(pos).toContainText('Page 2 of');
   // Tapping the right third of the page turns it too (events inside the sandboxed frame).
   // Wait for the page-turn animation to end: mid-slide the frame is moved aside.
   await expect(page.locator('iframe[title="Page turn"]')).toBeHidden();
   const box = (await iframe.boundingBox())!;
   await page.mouse.click(box.x + box.width * 0.9, box.y + box.height / 2);
   await showControls(page);
-  await expect(pos).toContainText('3 /');
+  await expect(pos).toContainText('Page 3 of');
   await shot(page, 'epub-desktop');
+
+  // Pages count across the whole book: the long last chapter takes most of it.
+  const { total } = await bookPage(page);
+  const slider = page.getByRole('slider', { name: 'Page in book' });
+  await expect(slider).toHaveAttribute('max', String(total - 1));
+  await showControls(page);
+  await page.getByRole('button', { name: 'Contents' }).click();
+  await page.getByRole('button', { name: 'Lamps' }).click();
+  await expect(frame.locator('h1')).toHaveText('Lamps');
+  const lamps = await bookPage(page);
+  await showControls(page);
+  await page.getByRole('button', { name: 'Contents' }).click();
+  await page.getByRole('button', { name: 'Closing Time' }).click();
+  await expect(frame.locator('h1')).toHaveText('Closing Time');
+  const closing = await bookPage(page);
+  expect(lamps.at).toBeGreaterThan(3);
+  expect(closing.at - lamps.at).toBeLessThan(total - closing.at);
+  // The slider goes to a page of the book, here the last one.
+  await showControls(page);
+  await slider.fill(String(total - 1));
+  await expect(pos).toHaveText(new RegExp(`Page ${total} of ${total} · 100%`));
+  await showControls(page);
+  await slider.fill('2');
+  await expect(frame.locator('h1')).toHaveText('The Quiet Hour');
+  await expect(pos).toContainText('Page 3 of');
+
   await page.waitForTimeout(800);
   await page.reload();
   await showControls(page);
-  await expect(page.locator('.pos')).toContainText('3 /');
+  // The counts come from the cache: exact right away.
+  await expect(page.locator('.pos')).toHaveText(new RegExp(`Page 3 of ${total} ·`), { timeout: 3_000 });
 
   // Internal link goes to chapter 3; the TOC jumps back to chapter 2.
   await page.getByRole('button', { name: 'Contents' }).click();
@@ -167,6 +202,8 @@ test('import, read, restore progress, work offline', async ({ page, context }) =
   await page.getByRole('button', { name: 'Larger text' }).click();
   await page.keyboard.press('Escape');
   await expect(frame.locator('h1')).toHaveText('Lamps');
+  // Larger text: more pages, counted again for the new layout.
+  await expect.poll(async () => (await bookPage(page)).total, { timeout: 15_000 }).toBeGreaterThan(total);
   await page.setViewportSize(MOBILE);
   await showControls(page);
   await shot(page, 'epub-mobile');

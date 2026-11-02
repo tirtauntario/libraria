@@ -4,6 +4,11 @@ import type { BookmarkList } from './bookmarks.svelte';
 
 export type Panel = 'toc' | 'bookmarks' | 'settings' | null;
 
+export interface PageCache {
+  get(layout: string): Promise<number[] | null>;
+  put(layout: string, counts: number[]): Promise<void>;
+}
+
 /** Props every reader component receives from the reader page. */
 export interface ReaderProps {
   /** Always hashed by the time a reader opens (sha512 is set). */
@@ -15,6 +20,8 @@ export interface ReaderProps {
   edge: 'start' | 'end' | null;
   bookmarks: BookmarkList;
   siblings: { prev: BookRecord | null; next: BookRecord | null };
+  /** Device-only store for EPUB page counts per layout. Absent when nothing may be stored. */
+  pageCache?: PageCache;
   /** Report the current position (debounced and saved by the page). */
   onlocation: (loc: Locator) => void;
   onback: () => void;

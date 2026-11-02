@@ -88,6 +88,18 @@ export interface ChangeRecord {
   updatedAt: number;
 }
 
+/**
+ * Page counts of an EPUB's chapters for one layout (font, size, margins, frame
+ * size...). Device-only, never synced: another screen paginates differently.
+ */
+export interface PageCountRecord {
+  /** `<sha512>:<layout key>` */
+  id: string;
+  sha512: string;
+  counts: number[];
+  usedAt: number;
+}
+
 /** A book being sent to a Libraria server (persisted so it survives reloads). */
 export interface UploadJobRecord {
   id: string;
@@ -184,6 +196,12 @@ export interface LibrariaDB extends DBSchema {
     value: UploadJobRecord;
     indexes: { bookId: string; sourceId: string };
   };
+  /** Since v3: EPUB page counts per layout (see PageCountRecord). */
+  pageCounts: {
+    key: string;
+    value: PageCountRecord;
+    indexes: { sha512: string };
+  };
 }
 
 export type Db = IDBPDatabase<LibrariaDB>;
@@ -232,6 +250,11 @@ export const MIGRATIONS: ((db: Db, tx: UpgradeTx) => void)[] = [
     const uploads = db.createObjectStore('uploads', { keyPath: 'id' });
     uploads.createIndex('bookId', 'bookId');
     uploads.createIndex('sourceId', 'sourceId');
+  },
+  // v3: EPUB page counts per layout
+  (db) => {
+    const counts = db.createObjectStore('pageCounts', { keyPath: 'id' });
+    counts.createIndex('sha512', 'sha512');
   },
 ];
 

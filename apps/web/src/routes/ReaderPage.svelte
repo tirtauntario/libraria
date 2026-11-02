@@ -58,7 +58,15 @@
       if (controller.signal.aborted) return;
       ready = {
         component,
-        props: { book, blob: opened.blob, initial, edge, bookmarks, siblings: seriesSiblings(book, catalog.books) },
+        props: {
+          book,
+          blob: opened.blob,
+          initial,
+          edge,
+          bookmarks,
+          siblings: seriesSiblings(book, catalog.books),
+          pageCache: { get: (layout) => s.repo.getPageCounts(sha, layout), put: (layout, counts) => s.repo.savePageCounts(sha, layout, counts) },
+        },
       };
     } catch (err) {
       if ((err as Error)?.name === 'AbortError') return;

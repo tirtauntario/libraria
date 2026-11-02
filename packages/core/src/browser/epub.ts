@@ -61,6 +61,11 @@ export class EpubBook {
     return this._info;
   }
 
+  /** Uncompressed size in bytes of each spine item, a cheap measure of its length. */
+  spineSizes(): number[] {
+    return this.spineHrefs.map((h) => this.entry(h)?.uncompressedSize ?? 0);
+  }
+
   /** Full path (inside the zip) of a spine item. */
   spinePath(index: number): string | null {
     return this.spineHrefs[index] ?? null;

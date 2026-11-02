@@ -108,8 +108,8 @@ const LOREM =
   'It was the quiet hour before the lamps were lit, and the reading room held its breath. Shelves leaned toward one another like old friends sharing a secret. ' +
   'Somewhere a clock disagreed with the cathedral bells, and nobody minded. She turned the page and the page turned her, the way good pages do. ';
 
-function chapter(n: number, title: string, extra = ''): string {
-  const paras = Array.from({ length: 14 }, (_, i) => `<p>${LOREM.repeat(1 + (i % 3))}</p>`).join('\n');
+function chapter(n: number, title: string, extra = '', length = 14): string {
+  const paras = Array.from({ length }, (_, i) => `<p>${LOREM.repeat(1 + (i % 3))}</p>`).join('\n');
   return `<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
@@ -172,8 +172,9 @@ export async function makeEpub(): Promise<Buffer> {
     '<p><a id="go-ch3" href="ch3.xhtml#end-3">Skip to the end</a> · <a id="external" href="https://example.com/">external link</a> · ' +
     '<a href="javascript:parent.__pwned=1">bad link</a></p>';
   await zip.add('OEBPS/text/ch1.xhtml', new TextReader(chapter(1, 'The Quiet Hour', hostile)));
-  await zip.add('OEBPS/text/ch2.xhtml', new TextReader(chapter(2, 'Lamps')));
-  await zip.add('OEBPS/text/ch3.xhtml', new TextReader(chapter(3, 'Closing Time')));
+  // Uneven chapters: a short one and a long one, so whole-book pages differ from "chapter N of 3".
+  await zip.add('OEBPS/text/ch2.xhtml', new TextReader(chapter(2, 'Lamps', '', 3)));
+  await zip.add('OEBPS/text/ch3.xhtml', new TextReader(chapter(3, 'Closing Time', '', 42)));
   return bytes(await zip.close());
 }
 

@@ -10,6 +10,8 @@
   import { pageFromProgression, samePosition } from '../locator';
   import ReaderChrome from '../ReaderChrome.svelte';
   import type { Panel, ReaderProps } from '../types';
+  import { bookPage, chapterPages, layoutKey, locateFraction, locatePage, pageFraction, sizeFraction, sum } from './pages';
+  import { countChapterPages, settled } from './paginate';
   import { BOOK_FONTS, BOOK_THEMES, countPages, FONT_SIZE, LINE_HEIGHT, MARGIN, readerCss, WORD_SPACING } from './style';
   import { commitDrag, type Corner, curlGeometry, dragShare, easeOutCubic, polygonCss, TURN_MS } from './turn';
 
@@ -24,7 +26,7 @@
    * a second, inert frame (the "peel") holds the same chapter and shows the
    * page being left while the main frame already shows the next one.
    */
-  let { book, blob, initial, edge, bookmarks, onlocation, onback }: ReaderProps = $props();
+  let { book, blob, initial, edge, bookmarks, pageCache, onlocation, onback }: ReaderProps = $props();
 
   let epub = $state.raw<EpubBook | null>(null);
   let error = $state<string | null>(null);
@@ -64,6 +66,7 @@
       const e = await EpubBook.open(blob);
       if (e.spineLength === 0) throw new Error('This book has no readable chapters.');
       epub = e;
+      sizes = e.spineSizes();
       // Wait for the frame to be measured: pagination depends on its size.
       for (let i = 0; i < 60 && (!W || !H); i++) await new Promise((r) => requestAnimationFrame(r));
       let start: Target = { kind: 'start' };
@@ -83,6 +86,7 @@
   });
 
   onDestroy(() => {
+    countJob?.abort();
     detach?.();
     epub?.close();
   });
@@ -131,20 +135,10 @@
     measure();
     position(target);
     loading = false;
+    void ensureCounts();
     report();
     // The frame may have been resized or settings changed while loading.
     if (css() !== usedCss) void relayout();
-  }
-
-  /** Wait for fonts and images, which change the layout. */
-  async function settled(doc: Document): Promise<void> {
-    const imgs = Array.from(doc.images).filter((i) => !i.complete);
-    const wait = Promise.all([
-      doc.fonts?.ready.catch(() => {}),
-      ...imgs.map((i) => new Promise((r) => ((i.onload = r), (i.onerror = r)))),
-    ]);
-    await Promise.race([wait, new Promise((r) => setTimeout(r, 1500))]);
-    await new Promise((r) => requestAnimationFrame(() => r(null)));
   }
 
   function scroller(): Element | null {
@@ -228,6 +222,7 @@
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null))));
     measure();
     position({ kind: 'progression', value: keep });
+    void ensureCounts();
     report();
   }
 
@@ -484,7 +479,8 @@
   }
 
   function here(): Locator {
-    return { type: 'epub', spine, progression: Math.min(1, Math.max(0, progression)), total, ...(chapterTitle ? { label: chapterTitle } : {}) };
+    const at: Locator = { type: 'epub', spine, progression: Math.min(1, Math.max(0, progression)), total, percent: overall };
+    return chapterTitle ? { ...at, label: chapterTitle } : at;
   }
 
   let lastProgression = 0;
@@ -492,6 +488,88 @@
     lastProgression = progression;
     if (epub) onlocation(here());
   }
+
+  // --- whole-book pages ---------------------------------------------------------------
+
+  /** Size in bytes of each chapter: a stand-in for length until pages are counted. */
+  let sizes = $state.raw<number[]>([]);
+  /** Page count of each chapter for the layout `countsKey`; null where not counted yet. */
+  let counts = $state.raw<(number | null)[]>([]);
+  let countsKey = '';
+  let countJob: AbortController | null = null;
+
+  /**
+   * Make sure the chapters' pages are counted for the current layout: from the
+   * cache, else in the background. Called whenever the chapter on screen was
+   * (re)measured, whose live count always wins.
+   */
+  async function ensureCounts() {
+    const e = epub;
+    if (!e || !paginated || !lastCss) {
+      countJob?.abort();
+      countJob = null;
+      countsKey = '';
+      return;
+    }
+    const key = layoutKey(lastCss);
+    if (key !== countsKey) {
+      countJob?.abort();
+      countJob = null;
+      countsKey = key;
+      counts = Array.from({ length: e.spineLength }, () => null);
+      const cached = await pageCache?.get(key).catch(() => null);
+      if (countsKey !== key) return;
+      if (cached?.length === e.spineLength) counts = cached;
+    }
+    setCount(spine, pages, key);
+    if (countJob || counts.every((c) => c != null)) return;
+    const job = new AbortController();
+    countJob = job;
+    await countChapterPages({
+      book: e,
+      css: lastCss,
+      width: iw,
+      height: ih,
+      signal: job.signal,
+      known: (i) => counts[i] != null,
+      onCount: (i, n) => {
+        if (countsKey === key && counts[i] == null) counts = withCount(counts, i, n);
+      },
+    });
+    if (countJob === job) countJob = null;
+    if (!job.signal.aborted && countsKey === key) saveCounts(key);
+  }
+
+  function setCount(i: number, n: number, key: string) {
+    if (countsKey !== key || counts[i] === n) return;
+    const wasComplete = counts.every((c) => c != null);
+    counts = withCount(counts, i, n);
+    // A complete set is already stored: keep it in step with what the screen shows.
+    if (wasComplete) saveCounts(key);
+  }
+
+  function saveCounts(key: string) {
+    if (counts.every((c) => c != null)) void pageCache?.put(key, counts as number[]).catch(() => {});
+  }
+
+  function withCount(list: (number | null)[], i: number, n: number): (number | null)[] {
+    const next = list.slice();
+    next[i] = n;
+    return next;
+  }
+
+  /**
+   * Pages of every chapter, or null in scrolled mode or before any count. The
+   * chapter on screen counts as measured live, except while the next one loads
+   * (`pages` still belongs to the old chapter then).
+   */
+  const bookPages = $derived.by(() => {
+    if (!paginated) return null;
+    const live = !loading && spine < counts.length ? withCount(counts, spine, pages) : counts;
+    const known = chapterPages(live, sizes);
+    return known && { ...known, total: sum(known.pages) };
+  });
+  const currentPage = $derived(bookPages ? bookPage(bookPages.pages, spine, page) : 0);
 
   // --- events inside the book document --------------------------------------------
 
@@ -694,8 +772,35 @@
     return best?.title ?? '';
   });
 
-  const overall = $derived(total ? Math.min(1, (spine + progression) / total) : 0);
+  /** Position in the whole book, 0..1: by pages once counted, else by chapter size. */
+  const overall = $derived(bookPages ? pageFraction(currentPage, bookPages.total) : sizeFraction(sizes, spine, progression));
+  /** While dragging: the book page (paginated) or fraction (scrolled) under the thumb. */
   let sliderValue = $state<number | null>(null);
+  const preview = $derived.by(() => {
+    if (sliderValue == null) return null;
+    if (bookPages) {
+      const at = locatePage(bookPages.pages, sliderValue);
+      return { spine: at.spine, page: sliderValue };
+    }
+    return { spine: locateFraction(sizes, sliderValue).spine, page: null };
+  });
+
+  function titleOf(s: number): string {
+    let best: EpubTocEntry | undefined;
+    for (const t of flat) if (t.spine >= 0 && t.spine <= s && (!best || t.spine >= best.spine)) best = t;
+    return best?.title || `Section ${s + 1} of ${total}`;
+  }
+
+  function seek(v: number) {
+    sliderValue = null;
+    if (bookPages) {
+      const at = locatePage(bookPages.pages, v);
+      jump({ type: 'epub', spine: at.spine, progression: at.page / (bookPages.pages[at.spine] ?? 1), total });
+    } else {
+      const at = locateFraction(sizes, v);
+      jump({ type: 'epub', spine: at.spine, progression: at.progression, total });
+    }
+  }
 
   function changeSize(delta: number) {
     settings.updateSynced((s) => (s.book.fontSize = Math.min(FONT_SIZE.max, Math.max(FONT_SIZE.min, s.book.fontSize + delta))));
@@ -806,29 +911,51 @@
   <div class="footer">
     <button class="icon-btn" type="button" aria-label={rtl ? 'Next' : 'Previous'} onclick={() => (rtl ? next() : prev())}><Icon name="chevron-left" /></button>
     <div class="progress">
-      <input
-        class="slider"
-        type="range"
-        min="0"
-        max={total}
-        step="0.01"
-        dir={rtl ? 'rtl' : 'ltr'}
-        value={sliderValue ?? spine + progression}
-        aria-label="Position in book"
-        oninput={(e) => (sliderValue = Number(e.currentTarget.value))}
-        onchange={(e) => {
-          const v = Number(e.currentTarget.value);
-          sliderValue = null;
-          const s = Math.min(total - 1, Math.floor(v));
-          jump({ type: 'epub', spine: s, progression: v - s, total });
-        }}
-      />
+      {#if bookPages}
+        <input
+          class="slider"
+          type="range"
+          min="0"
+          max={Math.max(0, bookPages.total - 1)}
+          step="1"
+          dir={rtl ? 'rtl' : 'ltr'}
+          value={sliderValue ?? currentPage}
+          aria-label="Page in book"
+          aria-valuetext={`Page ${(sliderValue ?? currentPage) + 1} of ${bookPages.total}`}
+          oninput={(e) => (sliderValue = Number(e.currentTarget.value))}
+          onchange={(e) => seek(Number(e.currentTarget.value))}
+        />
+      {:else}
+        <input
+          class="slider"
+          type="range"
+          min="0"
+          max="1"
+          step="0.001"
+          dir={rtl ? 'rtl' : 'ltr'}
+          value={sliderValue ?? overall}
+          aria-label="Position in book"
+          oninput={(e) => (sliderValue = Number(e.currentTarget.value))}
+          onchange={(e) => seek(Number(e.currentTarget.value))}
+        />
+      {/if}
       <div class="meta">
-        <span class="chapter">{chapterTitle || `Section ${spine + 1} of ${total}`}</span>
-        <span class="pos">
-          {#if paginated}{page + 1} / {pages} ·{/if}
-          {Math.round(overall * 100)}%
-        </span>
+        {#if preview}
+          <span class="chapter">{titleOf(preview.spine)}</span>
+          <span class="pos">
+            {#if bookPages && preview.page != null}Page {preview.page + 1} of {bookPages.exact ? '' : '~'}{bookPages.total} ·{/if}
+            {Math.round((bookPages && preview.page != null ? pageFraction(preview.page, bookPages.total) : (sliderValue ?? 0)) * 100)}%
+          </span>
+        {:else}
+          <span class="chapter">
+            <span class="chapter-title">{chapterTitle || `Section ${spine + 1} of ${total}`}</span>
+            {#if bookPages && pages - page > 1}<span class="left">· {pages - page - 1} {pages - page - 1 === 1 ? 'page' : 'pages'} left</span>{/if}
+          </span>
+          <span class="pos" title={bookPages && !bookPages.exact ? 'Counting pages…' : undefined}>
+            {#if bookPages}Page {currentPage + 1} of {bookPages.exact ? '' : '~'}{bookPages.total} ·{/if}
+            {Math.round(overall * 100)}%
+          </span>
+        {/if}
       </div>
     </div>
     <button class="icon-btn" type="button" aria-label={rtl ? 'Previous' : 'Next'} onclick={() => (rtl ? prev() : next())}><Icon name="chevron-right" /></button>
@@ -1009,9 +1136,17 @@
   }
   .chapter {
     min-width: 0;
+    display: flex;
+    gap: 4px;
+    white-space: nowrap;
+  }
+  .chapter-title {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
+  }
+  .left {
+    flex: none;
   }
   .pos {
     flex: none;
