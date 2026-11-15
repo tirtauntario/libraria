@@ -589,6 +589,9 @@
         return;
       }
       if (doc.getSelection()?.toString()) return;
+      // Mark the tap handled: on Android, Chrome shows "Touch to Search" (a definition
+      // sheet for the tapped word) for taps the page leaves unhandled.
+      e.preventDefault();
       const w = doc.documentElement.clientWidth;
       if (!paginated) {
         visible = !visible;
