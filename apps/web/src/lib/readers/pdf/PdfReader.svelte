@@ -183,6 +183,9 @@
   function onclick(e: MouseEvent) {
     if (!viewer || (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8)) return;
     if (window.getSelection()?.toString()) return; // selecting text
+    if ((e.target as Element | null)?.closest?.('a[href]')) return;
+    // Handled: keeps Chrome's "Touch to Search" from defining the tapped word (Android).
+    e.preventDefault();
     const zone = ps.mode === 'paged' ? clickZone(e, viewer) : 'middle';
     if (zone === 'middle') visible = !visible;
     else if (zone === 'right') next();
