@@ -430,13 +430,17 @@
   const sh = $derived(Math.floor(SH));
   /** Inline styles for the sheets and the overlays while a page turns. */
   const layers = $derived.by(() => {
-    const idle = { main: '', peel: 'visibility: hidden;', shadow: '', flap: '' };
+    // Between turns the peel waits under the (opaque) main sheet instead of being hidden, and
+    // both sheets stay on their own compositor layers (see `.sheet`). Showing, hiding or
+    // re-layering a frame at the start and end of each turn makes the browser re-raster it,
+    // which flashes the page on phones.
+    const idle = { main: 'z-index: 1;', peel: 'z-index: 0;', shadow: '', flap: '' };
     if (!turn || turnStyle === 'none') return idle;
     const { p, dir } = turn;
     const peelIsEarlier = dir > 0;
     if (turnStyle === 'slide') {
       const s = rtl ? -1 : 1;
-      const earlier = `z-index: 2; transform: translateX(${-s * p * sw}px); box-shadow: 0 0 24px rgb(0 0 0 / 0.18);`;
+      const earlier = `z-index: 2; transform: translateX(${-s * p * sw}px);`;
       const later = `z-index: 1; transform: translateX(${s * (1 - p) * sw}px);`;
       return { main: peelIsEarlier ? later : earlier, peel: peelIsEarlier ? earlier : later, shadow: '', flap: '' };
     }
@@ -979,7 +983,7 @@
   tone={bs.theme}
 >
   <div class="paper" style:background={theme.bg} style:color={theme.fg}>
-    <div class="host" class:turning={!!turn} bind:clientWidth={SW} bind:clientHeight={SH}>
+    <div class="host" bind:clientWidth={SW} bind:clientHeight={SH}>
       <div class="area" bind:clientWidth={W} bind:clientHeight={H}></div>
       <!-- Each frame sits on a full-size sheet, so a turn moves the whole page, margins included. -->
       <div class="sheet" style={layers.main} style:background={theme.bg}>
@@ -1062,6 +1066,10 @@
   .sheet {
     position: absolute;
     inset: 0;
+    /* Always composited, so a turn never promotes or demotes the frames (a re-raster flash). */
+    will-change: transform;
+    /* Off-screen while a sheet covers the page; only shows as the slide's edge moves. Curl clips it away. */
+    box-shadow: 0 0 24px rgb(0 0 0 / 0.18);
   }
   iframe {
     position: absolute;
@@ -1077,9 +1085,6 @@
   }
   .peel {
     pointer-events: none;
-  }
-  .turning .sheet {
-    will-change: transform, clip-path;
   }
   .turn-layer {
     position: absolute;
