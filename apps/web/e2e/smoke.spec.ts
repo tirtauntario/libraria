@@ -151,8 +151,9 @@ test('import, read, restore progress, work offline', async ({ page, context }) =
   await page.keyboard.press('ArrowRight');
   await expect(pos).toContainText('Page 2 of');
   // Tapping the right third of the page turns it too (events inside the sandboxed frame).
-  // Wait for the page-turn animation to end: mid-slide the frame is moved aside.
-  await expect(page.locator('iframe[title="Page turn"]')).toBeHidden();
+  // Wait for the page-turn animation to end: mid-slide the frame is moved aside
+  // (the overlay that catches taps during a turn is gone then).
+  await expect(page.locator('.turn-catch')).toHaveCount(0);
   const box = (await iframe.boundingBox())!;
   await page.mouse.click(box.x + box.width * 0.9, box.y + box.height / 2);
   await showControls(page);
